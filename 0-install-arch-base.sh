@@ -26,7 +26,9 @@ Requirements
 
 Running
    1. Boot to Distro USB to root login prompt
-   2. bash < (curl -L github.com/insomnicles/scripts/0-install-base.sh)
+   2. iwctl wlan0 station "wifi-access-point"
+   enter "password"
+   3. bash < (curl -L github.com/insomnicles/scripts/0-install-base.sh)
 
 EOF
 
@@ -70,7 +72,7 @@ arch_time() {
 
 arch_locale() {
    sed -i "/en_US.UTF8 UTF8/s/^#//g" /etc/locale.gen
-   local-gen
+   locale-gen
 }
 
 
@@ -92,6 +94,8 @@ EOF
    mount --mkdir /dev/sda4 /mnt/home
    genfstab -U /mnt >> /mnt/etc/fstab
    arch-chroot /mnt
+   echo "press any key to continue"
+   read cont
 }
 
 arch_root() {
@@ -100,19 +104,19 @@ arch_root() {
 }
 
 arch_enable_sudoers() {
-   echo "Uncomment like wheel ALL=(ALL:ALL) ALL"
+   echo "Setting uip soders" #Uncomment like wheel ALL=(ALL:ALL) ALL"
    read userwait
-   #sed -i "/%wheel ALL=(ALL:ALL) ALL/s/^# //g" /etc/sudoers
-   visudo
+   sed -i "/%wheel ALL=(ALL:ALL) ALL/s/^# //g" /etc/sudoers
+   #visudo
 }
 
 arch_user() {
    echo "Enter Regular User Name\n"
    echo "This user will have sudo access\n"
    read new_username
-   if [ -d "/home/${new_username}" ]; then
-	echo "exit: that user exists already"
-   fi
+ #   if [ -d "/home/${new_username}" ]; then
+	# echo "exit: that user exists already"
+ #   fi
    useradd -m -G wheel -s /bin/bash ${username}
 }
 
@@ -168,14 +172,14 @@ EOF
 
 install_arch_base() {
     arch_greeting
-    arch_internet
+%    arch_internet
     arch_base
-    arch_time
-    arch_locale
     arch_partition
     arch_root
     arch_enable_sudoers
     arch_user
+    arch_time
+    arch_locale
     arch_network_config
     arch_bootloader
     arch_system_setuup
