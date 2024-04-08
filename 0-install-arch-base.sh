@@ -62,12 +62,14 @@ arch_internet() {
 
 arch_base() {
    pacstrap -K /mnt base linux linux-firmware sof-firmware iwd man-db man-pages texinfo neovim vi base-devel sudo pacman-contrib intel-ucode grub efibootmgr git openssh zsh
+   genfstab -U /mnt >> /mnt/etc/fstab
+   arch-chroot /mnt
 }
 
 arch_time() {
-   ln -sf /usr/share/zoneinfo/Canada/Eastern /etc/localtime
-   hwclock --systohc        # generates /etc/adjtime
-   # systemctl enable systemd-timesyncd
+  timedatectl
+  ln -sf /usr/share/zoneinfo/Canada/Eastern /etc/localtime
+  hwclock --systohc        # generates /etc/adjtime
 }
 
 arch_locale() {
@@ -96,10 +98,6 @@ EOF
    mount --mkdir /dev/sda4 /mnt/home    # mounting /home
    swapon /dev/sda3                     # swap on
 
-   genfstab -U /mnt >> /mnt/etc/fstab
-   arch-chroot /mnt
-   echo "press any key to continue"
-   read cont
 }
 
 arch_root() {
@@ -182,8 +180,8 @@ EOF
 install_arch_base() {
     arch_greeting
 #    arch_internet
-    arch_base
     arch_partition
+    arch_base
     arch_time
     arch_locale
     arch_network_config
