@@ -54,8 +54,8 @@ EOF
 arch_internet() {
    # ethernet should work out of the box
    # mobile requires mbctrl
-   iwctl wlan0 station scan
-   echo "Enter Wifi Access Point\n"
+   iwctl station wlan0 get-networks
+   echo "Enter Wifi Access Point Name\n"
    read name
    iwctl wlan0 station ${name}
 }
@@ -65,33 +65,37 @@ arch_base() {
 }
 
 arch_time() {
-   timedatectl 
    ln -sf /usr/share/zoneinfo/Canada/Eastern /etc/localtime
-   hwclock --systohc
+   hwclock --systohc        # generates /etc/adjtime
+   # systemctl enable systemd-timesyncd
 }
 
 arch_locale() {
    sed -i "/en_US.UTF8 UTF8/s/^#//g" /etc/locale.gen
    locale-gen
+   echo "LANG=en_US.UTF-8" > /etc/locale.conf
 }
 
 
 arch_partition() {
-   # partiioning: EFI /boot, cache, root home
-cat <<"EOF"
+
+  cat <<"EOF"
 Partitioning...
 EFI/boot:	/dev/sda1
 root(/):	/dev/sda2
 cache:		/dev/sda3
 home (/home):	/dev/sda4
 EOF
-   mkfs.fat -F 32 /dev/sda1
-   mkfs.ext4 /dev/sda2
-   mkswap /dev/sda3
-   mount --mkdir /dev/sda2 /mnt
-   mount --mkdir /dev/sda1 /mnt/boot
-   swapon /dev/sda3
-   mount --mkdir /dev/sda4 /mnt/home
+
+   mkfs.fat -F 32 /dev/sda1             # formatting efi boot partition
+   mkfs.ext4 /dev/sda2                  # formatting root partition
+   mkswap /dev/sda3                     # creating swap partition
+
+   mount --mkdir /dev/sda2 /mnt         # mounting /
+   mount --mkdir /dev/sda1 /mnt/boot    # mounting /boot
+   mount --mkdir /dev/sda4 /mnt/home    # mounting /home
+   swapon /dev/sda3                     # swap on
+
    genfstab -U /mnt >> /mnt/etc/fstab
    arch-chroot /mnt
    echo "press any key to continue"
@@ -105,8 +109,8 @@ arch_root() {
 
 arch_enable_sudoers() {
    echo "Setting uip soders" #Uncomment like wheel ALL=(ALL:ALL) ALL"
-   read userwait
-   sed -i "/%wheel ALL=(ALL:ALL) ALL/s/^# //g" /etc/sudoers
+   read new_userwait
+   sed -i "/wheel ALL=(ALL:ALL) ALL/s/^# //g" /etc/sudoers
    #visudo
 }
 
@@ -117,13 +121,18 @@ arch_user() {
  #   if [ -d "/home/${new_username}" ]; then
 	# echo "exit: that user exists already"
  #   fi
-   useradd -m -G wheel -s /bin/bash ${username}
+   useradd -m -G wheel -s /bin/bash ${new_username}
 }
 
 
 arch_network_config() {
 
-cat "EOF"
+  echo "Enter hostname:"
+  read $new_hostname
+
+  echo $new_hostname > /etc/hostname
+
+  cat "EOF"
 [Match]
 Name=wlan0
 
@@ -132,8 +141,8 @@ DHCP=yes
 IgnoreCarrierLoss=3s
 EOF > /etc/systemd/network/25-wireless.network
 
-mkdir /etc/iwd
-cat "EOF"
+  mkdir /etc/iwd
+  cat "EOF"
 [General]
 EnableNetworkConfiguration=true
 EOF > /etc/iwd/main.conf
@@ -141,20 +150,20 @@ EOF > /etc/iwd/main.conf
 }
 
 arch_bootloader() {
-   pacman -S --needed --noconfirm grub efibootmgr
-   grub-install --target=x86_64 --efi-directory=/boot --bootloader-id=GRUB
-   grub-mkconfig -o /boot/grub/grub.cfg
+  #pacman -S --needed --noconfirm grub efibootmgr
+  grub-install --target=x86_64 --efi-directory=/boot --bootloader-id=GRUB
+  grub-mkconfig -o /boot/grub/grub.cfg
 }
 
 arch_system_setup() {
-   systemctl enable iwd
-   systemctl enable systemd-resolved 
-   systemctl enable systemd-timesyncd
-   systemctl enable sshd
+  systemctl enable iwd                     # wifi/dhcp
+  systemctl enable systemd-resolved        # dns
+  systemctl enable systemd-timesyncd
+  systemctl enable sshd
 }
 
 arch_install_complete() {
-cat <<"EOF"
+  cat <<"EOF"
 Installation complete!
 
 - remove USB 
@@ -175,14 +184,14 @@ install_arch_base() {
 #    arch_internet
     arch_base
     arch_partition
-    arch_root
-    arch_enable_sudoers
-    arch_user
     arch_time
     arch_locale
     arch_network_config
+    arch_root
+    arch_enable_sudoers
+    arch_user
     arch_bootloader
-    arch_system_setuup
+    arch_system_setup
     arch_install_complete
 }
 
