@@ -177,11 +177,43 @@ Editor: neovim vi
 EOF
 }
 
+arch_fonts() {
+  pacman -S --needed --noconfirm ttf-dejavu gnu-free-fonts
+}
+
+arch_X11() {
+	declare -a pacs_X11=(
+		xorg-server 
+		xorg-xinit 
+		xf86-input-libinput 
+		xorg-server-common 
+		xorg-xclipboard 
+		xterm 
+		xclip
+		dmenu 
+		i3
+		i3lock
+		i3status
+		i3blocks
+		rofi 
+	)
+	for value in "${pacs_X11[@]}"
+	do
+		pacman -S --needed --noconfirm $value
+
+	done
+}
+
+
+
+
 install_arch_base() {
     arch_greeting
 #    arch_internet
     arch_partition
     arch_base
+    arch_fonts
+    arch_x11
     arch_time
     arch_locale
     arch_network_config
