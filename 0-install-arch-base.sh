@@ -172,7 +172,7 @@ EOF
 
 install_arch_base() {
     arch_greeting
-%    arch_internet
+#    arch_internet
     arch_base
     arch_partition
     arch_root
