@@ -4,6 +4,7 @@
 #  - sed for WHEEL sudo
 #  - sed command for locale file modification
 #  - auto vs. interactie mode
+#  - microcode install
 # BUGS:
 #  - hwclock
 
