@@ -1,5 +1,6 @@
 # scripts
 
+A script for a minimal Arch OS installation following the installation guide 
 
 # Requirements
 
