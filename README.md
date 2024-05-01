@@ -12,6 +12,6 @@
 2. Run 
 
 ```
-  $ bash <(curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/0-install-arch-base.sh)
+  $ bash <(curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/0-install-arch-base-stage-1.sh)
 ```
 
