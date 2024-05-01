@@ -55,12 +55,12 @@ x11() {
 }
 
 
-time() {
+time_setup() {
    ln -sf /usr/share/zoneinfo/Canada/Eastern /etc/localtime
    hwclock --systohc        # generates /etc/adjtime
 }
 
-locale() {
+locale_setup() {
    sed -i 's/#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
    locale-gen
    echo "LANG=en_US.UTF-8" > /etc/locale.conf
@@ -149,8 +149,8 @@ install_arch_base_stage2() {
    greeting
    fonts
    x11
-   time
-   locale
+   time_setup
+   locale_setup
    network_config
    root_user
    sudoers
