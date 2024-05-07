@@ -1,13 +1,9 @@
 #!/bin/bash
 
 # TODO
-#  - microcode install
+#  microcode install
 
 ARCH_VERSION=2024-04-01
-HOSTNAME=""
-ROOT_PASSWD=""
-USERNAME=""
-USER_PASSWD=""
 
 greeting() {
 
@@ -78,26 +74,30 @@ download_stage2_script() {
 
 get_parameters() {
   printf "\n\nEnter hostname:"
-  read hostname
+  read inp_hostname
 
   printf "\n\nEnter root password:"
-  read root_passwd
+  read inp_root_passwd
 
   printf "\n\nEnter user name:"
-  read username
+  read inp_username
 
   printf "\n\nEnter ${username} password:"
-  read user_passwd
+  read inp_user_passwd
 
   printf "\n\nEnter wifi network:\n"
   #iwctl wlan0 get-networks
-  read wifi
+  read inp_wifi
 
-  HOSTNAME=$hostname
-  ROOT_PASSWD=${root_passwd}
-  USERNAME=${username}
-  USER_PASSWD=${user_passwd}
-  WIFI_NETWORK=${wifi}
+  printf "\n\nEnter wifi password:\n"
+  read inp_wifi_passwd
+
+  export ARCH_HOSTNAME=${inp_hostname}
+  export ARCH_ROOT_PASSWD=${inp_root_passwd}
+  export ARCH_USERNAME=${inp_username}
+  export ARCH_USER_PASSWD=${inp_user_passwd}
+  export ARCH_WIFI_NETWORK=${inp_wifi}
+  export ARCH_WIFI_NETWORK_PASSWD=${inp_wifi_passwd}
 }
 
 install_arch_base_stage1() {
@@ -106,7 +106,7 @@ install_arch_base_stage1() {
    partition_setup
    install_base_packages
    download_stage2_script
-   arch-chroot /mnt bash /root/0-install-arch-base-stage-2.sh $HOSTNAME $ROOT_PASSWD $USERNAME $USER_PASSWD $WIFI_NETWORK
+   arch-chroot /mnt bash /root/0-install-arch-base-stage-2.sh $ARCH_HOSTNAME $ARCH_ROOT_PASSWD $ARCH_USERNAME $ARCH_USER_PASSWD $ARCH_WIFI_NETWORK $ARCH_WIFI_NETWORK_PASSWD
    #rm /mnt/root/0-install-arch-base-stage-2.sh
    #reboot
 }

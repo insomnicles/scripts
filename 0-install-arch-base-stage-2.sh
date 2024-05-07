@@ -1,10 +1,11 @@
 #!/bin/bash
 
-HOSTNAME=$1
-ROOT_PASSWD=$2
-USERNAME=$3
-USER_PASSWD=$4
-WIFI_NETWORK=$5
+ARCH_HOSTNAME=$1
+ARCH_ROOT_PASSWD=$2
+ARCH_USERNAME=$3
+ARCH_USER_PASSWD=$4
+ARCH_WIFI_NETWORK=$5
+ARCH_WIFI_NETWORK_PASSWD=$6
 
 
 x11() {
@@ -45,7 +46,7 @@ locale_setup() {
 root_user() {
    # printf "\n\nEnter Root password\n"
    # passwd
-   usermod --password $ROOT_PASSWD root
+   usermod --password $ARCH_ROOT_PASSWD root
 }
 
 #v TODO: isudo in interactive mode
@@ -61,8 +62,8 @@ nonroot_user() {
    #printf "\n\nEnter ${new_username} password\n"
    #passwd ${new_username}
    
-   useradd -m -G wheel -s /bin/bash $USERNAME
-   usermod --password $USER_PASSWD $USERNAME
+   useradd -m -G wheel -s /bin/bash $ARCH_USERNAME
+   usermod --password $ARCH_USER_PASSWD $ARCH_USERNAME
 }
 
 
@@ -70,7 +71,7 @@ network_config() {
   # echo "\n\nEnter hostname:\n"
   # read new_hostname
   #echo $new_hostname > /etc/hostname
-  echo $HOSTNAME > /etc/hostname
+  echo $ARCH_HOSTNAME > /etc/hostname
 
 cat << "EOF" > /etc/systemd/network/25-wireless.network
 [Match]
@@ -92,14 +93,14 @@ EOF
 internet() {
    # ethernet should work out of the box
    # mobile requires mbctrl
-   WIFI=`iwctl device list |grep wlan0 | wc -l`
-   if [ ${WIFI} -eq 1 ]; then 
+   #WIFI=`iwctl device list |grep wlan0 | wc -l`
+   #if [ ${WIFI} -eq 1 ]; then 
      # printf "\n\nSetting up Wireless Network\n"
      # iwctl station wlan0 get-networks
      # echo "Enter Wifi Access Point Name\n"
      # read name
-     iwctl station wlan0 connect ${WIFI_NETWORK}
-   fi
+     #iwctl station wlan0 connect ${ARCH_WIFI_NETWORK} -p ${ARCH_WIFI_NETWORK_PASSWD}
+   #fi
 
    printf "\n\nSetting up Resolv.conf\n" 
    cp /etc/resolv.conf /etc/resolv.conf-bak
@@ -117,7 +118,7 @@ bootloader() {
 }
 
 system_setup() {
-  print "\n\n Setting up Daemons\n"
+  printf "\n\n Setting up Daemons\n"
   systemctl enable iwd                     # wifi/dhcp
   systemctl enable systemd-resolved        # dns
   systemctl enable systemd-timesyncd
@@ -140,6 +141,7 @@ install_arch_base_stage2() {
   echo $USERNAME
   echo $USER_PASSWD
   echo $WIFI_NETWORK
+  echo $WIFI_NETWORK_PASSWD
   exit
 
   x11
@@ -155,5 +157,6 @@ install_arch_base_stage2() {
   arch_install_complete
 }
 
-install_arch_base_stage2 2> /root/install-stage2-error.log > /root/install-stage2.log
+install_arch_base_stage2 
+#2> /root/install-stage2-error.log > /root/install-stage2.log
 
