@@ -112,7 +112,7 @@ internet() {
 
 bootloader() {
   #pacman -S --needed --noconfirm grub efibootmgr
-  print "\n\n Setting up Bootloader\n"
+  printf "\n\n Setting up Bootloader\n"
   grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
   grub-mkconfig -o /boot/grub/grub.cfg
 }
