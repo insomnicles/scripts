@@ -142,7 +142,6 @@ install_arch_base_stage2() {
   echo $ARCH_USER_PASSWD
   echo $ARCH_WIFI_NETWORK
   echo $ARCH_WIFI_NETWORK_PASSWD
-  exit
 
   x11
   time_setup
