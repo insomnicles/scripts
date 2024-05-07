@@ -136,12 +136,12 @@ EOF
 }
 
 install_arch_base_stage2() {
-  echo $HOSTNAME
-  echo $ROOT_PASSWD
-  echo $USERNAME
-  echo $USER_PASSWD
-  echo $WIFI_NETWORK
-  echo $WIFI_NETWORK_PASSWD
+  echo $ARCH_HOSTNAME
+  echo $ARCH_ROOT_PASSWD
+  echo $ARCH_USERNAME
+  echo $ARCH_USER_PASSWD
+  echo $ARCH_WIFI_NETWORK
+  echo $ARCH_WIFI_NETWORK_PASSWD
   exit
 
   x11
