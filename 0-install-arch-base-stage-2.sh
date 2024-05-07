@@ -79,8 +79,8 @@ EOF
 internet() {
    # ethernet should work out of the box
    # mobile requires mbctrl
-   wifi=`iwctl device list |grep wlan0 | wc -l`
-   if [ $wifi -eq 1 ]; then 
+   WIFI=`iwctl device list |grep wlan0 | wc -l`
+   if [ ${WIFI} -eq 1 ]; then 
      printf "\n\nSetting up Wireless Network\n"
      iwctl station wlan0 get-networks
      echo "Enter Wifi Access Point Name\n"

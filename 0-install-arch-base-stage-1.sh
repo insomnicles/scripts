@@ -66,7 +66,9 @@ install_base_packages() {
 }
 
 download_stage2_script() {
+   curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/0-install-arch-base-stage-1.sh > /mnt/root/0-install-arch-base-stage-1.sh
    curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/0-install-arch-base-stage-2.sh > /mnt/root/0-install-arch-base-stage-2.sh
+   chmod +x /mnt/root/0-install-arch-base-stage-1.sh
    chmod +x /mnt/root/0-install-arch-base-stage-2.sh
 }
 
@@ -76,8 +78,8 @@ install_arch_base_stage1() {
    install_base_packages
    download_stage2_script
    arch-chroot /mnt bash /root/0-install-arch-base-stage-2.sh
-   rm /mnt/root/0-install-arch-base-stage-2.sh
-   reboot
+   #rm /mnt/root/0-install-arch-base-stage-2.sh
+   #reboot
 }
 
 install_arch_base_stage1
