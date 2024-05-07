@@ -42,6 +42,7 @@ root_user() {
 
 #v TODO: isudo in interactive mode
 sudoers() {
+    printf "\n\nSetting up sudoers wheel group\n"
    sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 }
 
