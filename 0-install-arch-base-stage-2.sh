@@ -1,5 +1,12 @@
 #!/bin/bash
 
+HOSTNAME=$1
+ROOT_PASSWD=$2
+USERNAME=$3
+USER_PASSWD=$4
+WIFI_NETWORK=$5
+
+
 x11() {
 	declare -a pacs_X11=(
     ttf-dejavu 
@@ -36,8 +43,9 @@ locale_setup() {
 }
 
 root_user() {
-   printf "\n\nEnter Root password\n"
-   passwd
+   # printf "\n\nEnter Root password\n"
+   # passwd
+   usermod --password $ROOT_PASSWD root
 }
 
 #v TODO: isudo in interactive mode
@@ -47,18 +55,22 @@ sudoers() {
 }
 
 nonroot_user() {
-   printf "\n\nEnter Regular User Name (user will have sudo access):\n"
-   read new_username
-   useradd -m -G wheel -s /bin/bash ${new_username}
-   printf "\n\nEnter ${new_username} password\n"
-   passwd ${new_username}
+   # printf "\n\nEnter Regular User Name (user will have sudo access):\n"
+   # read new_username
+   #useradd -m -G wheel -s /bin/bash ${new_username}
+   #printf "\n\nEnter ${new_username} password\n"
+   #passwd ${new_username}
+   
+   useradd -m -G wheel -s /bin/bash $USERNAME
+   usermod --password $USER_PASSWD $USERNAME
 }
 
 
 network_config() {
-  echo "\n\nEnter hostname:\n"
-  read new_hostname
-  echo $new_hostname > /etc/hostname
+  # echo "\n\nEnter hostname:\n"
+  # read new_hostname
+  #echo $new_hostname > /etc/hostname
+  echo $HOSTNAME > /etc/hostname
 
 cat << "EOF" > /etc/systemd/network/25-wireless.network
 [Match]
@@ -82,11 +94,11 @@ internet() {
    # mobile requires mbctrl
    WIFI=`iwctl device list |grep wlan0 | wc -l`
    if [ ${WIFI} -eq 1 ]; then 
-     printf "\n\nSetting up Wireless Network\n"
-     iwctl station wlan0 get-networks
-     echo "Enter Wifi Access Point Name\n"
-     read name
-     iwctl station wlan0 connect ${name}
+     # printf "\n\nSetting up Wireless Network\n"
+     # iwctl station wlan0 get-networks
+     # echo "Enter Wifi Access Point Name\n"
+     # read name
+     iwctl station wlan0 connect ${WIFI_NETWORK}
    fi
 
    printf "\n\nSetting up Resolv.conf\n" 
@@ -117,25 +129,31 @@ arch_install_complete() {
 Installation complete!
 
 - remove USB 
-
 - reboot the system or type reboot
 
 EOF
 }
 
 install_arch_base_stage2() {
-   x11
-   time_setup
-   locale_setup
-   network_config
-   root_user
-   sudoers
-   nonroot_user
-   system_setup
-   internet
-   bootloader
-   arch_install_complete
+  echo $HOSTNAME
+  echo $ROOT_PASSWD
+  echo $USERNAME
+  echo $USER_PASSWD
+  echo $WIFI_NETWORK
+  exit
+
+  x11
+  time_setup
+  locale_setup
+  network_config
+  root_user
+  sudoers
+  nonroot_user
+  system_setup
+  internet
+  bootloader
+  arch_install_complete
 }
 
-install_arch_base_stage2
+install_arch_base_stage2 2> /root/install-stage2-error.log > /root/install-stage2.log
 
