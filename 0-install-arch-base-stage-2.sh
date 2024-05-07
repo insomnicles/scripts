@@ -1,39 +1,9 @@
 #!/bin/bash
 
-# 
-# TODO
-#  - microcode install
-# BUGS:
-#  - hwclock?????
-
-ARCH_VERSION=2024-04-01
-
-greeting() {
-
-cat <<"EOF"
-
------------------------------------------------------------------
-
-Hi, Arch Linux Install **Stage 2**
-
------------------------------------------------------------------
-
-ARCH VERSION: ${ARCH_VERSION}
-
-Requirements
-  1. Stage 1 of Install was successfull.
-
-Press any key to continue. Ctrl C to exit.
-EOF
-
-}
-
-fonts() {
- pacman -S --needed --noconfirm ttf-dejavu gnu-free-fonts
-}
-
 x11() {
 	declare -a pacs_X11=(
+    ttf-dejavu 
+    gnu-free-fonts
 		xorg-server 
 		xorg-xinit 
 		xf86-input-libinput 
@@ -54,7 +24,6 @@ x11() {
 	done
 }
 
-
 time_setup() {
    ln -sf /usr/share/zoneinfo/Canada/Eastern /etc/localtime
    hwclock --systohc        # generates /etc/adjtime
@@ -67,28 +36,26 @@ locale_setup() {
 }
 
 root_user() {
-   printf "\nEnter Root password"
+   printf "\n\nEnter Root password\n"
    passwd
 }
 
 #v TODO: isudo in interactive mode
 sudoers() {
-   printf "Setting uip soders"
    sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 }
 
 nonroot_user() {
-   printf "Enter Regular User Name\n"
-   printf "This user will have sudo access\n"
+   printf "\n\nEnter Regular User Name (user will have sudo access):\n"
    read new_username
    useradd -m -G wheel -s /bin/bash ${new_username}
-   printf "Enter ${new_username} password\n"
+   printf "\n\nEnter ${new_username} password\n"
    passwd ${new_username}
 }
 
 
 network_config() {
-  echo "Enter hostname:"
+  echo "\n\nEnter hostname:\n"
   read new_hostname
   echo $new_hostname > /etc/hostname
 
@@ -112,22 +79,32 @@ EOF
 internet() {
    # ethernet should work out of the box
    # mobile requires mbctrl
-   iwctl station wlan0 get-networks
-   echo "Enter Wifi Access Point Name\n"
-   read name
-   iwctl station wlan0 connect ${name}
-   mv /etc/resolv.conf /etc/resolv.conf-bak
+   wifi=`iwctl device list |grep wlan0 | wc -l`
+   if [ $wifi -eq 1 ]; then 
+     printf "\n\nSetting up Wireless Network\n"
+     iwctl station wlan0 get-networks
+     echo "Enter Wifi Access Point Name\n"
+     read name
+     iwctl station wlan0 connect ${name}
+   fi
+
+   printf "\n\nSetting up Resolv.conf\n" 
+   cp /etc/resolv.conf /etc/resolv.conf-bak
+   rm -f /etc/resolv.conf
+   cd /etc
    ln -sf ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
 }
 
 
 bootloader() {
   #pacman -S --needed --noconfirm grub efibootmgr
+  print "\n\n Setting up Bootloader\n"
   grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
   grub-mkconfig -o /boot/grub/grub.cfg
 }
 
 system_setup() {
+  print "\n\n Setting up Daemons\n"
   systemctl enable iwd                     # wifi/dhcp
   systemctl enable systemd-resolved        # dns
   systemctl enable systemd-timesyncd
@@ -146,8 +123,6 @@ EOF
 }
 
 install_arch_base_stage2() {
-   greeting
-   fonts
    x11
    time_setup
    locale_setup
@@ -158,7 +133,7 @@ install_arch_base_stage2() {
    system_setup
    internet
    bootloader
-   install_complete
+   arch_install_complete
 }
 
 install_arch_base_stage2

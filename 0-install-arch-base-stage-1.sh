@@ -33,7 +33,6 @@ Requirements
   Continue only if the above have been done correctly.
 
   Press any key to continue. Ctrl-C to exit.
-
 EOF
 read cont
 
@@ -66,27 +65,19 @@ install_base_packages() {
    genfstab -U /mnt >> /mnt/etc/fstab
 }
 
-epilogue() {
-
-  cat <<"EOF"
-
-  Stage 1 of installation complete.
-
-  Continue to Stage 2:
-
-  ./0-install-arch-base-stage-2.sh
-
-EOF
+download_stage2_script() {
+   curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/0-install-arch-base-stage-2.sh > /mnt/root/0-install-arch-base-stage-2.sh
+   chmod +x /mnt/root/0-install-arch-base-stage-2.sh
 }
-
 
 install_arch_base_stage1() {
    greeting
    partition_setup
    install_base_packages
-   epilogue
-   arch-chroot /mnt
+   download_stage2_script
+   arch-chroot /mnt bash /root/0-install-arch-base-stage-2.sh
+   rm /mnt/root/0-install-arch-base-stage-2.sh
+   reboot
 }
 
 install_arch_base_stage1
-
