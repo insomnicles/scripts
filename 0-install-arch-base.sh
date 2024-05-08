@@ -173,7 +173,7 @@ install_arch_base() {
    install_base_packages
    network_config
    create_stage2_script
-   arch-chroot /mnt bash /root/0-install-arch-base-stage-2.sh
+   arch-chroot /mnt /root/0-install-arch-base-stage-2.sh
    rm /mnt/root/0-install-arch-base-stage-2.sh
    arch_install_complete
 }
