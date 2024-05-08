@@ -19,8 +19,6 @@ A script for a minimal Arch OS installation following the installation guide
         /dev/sda4[nvme0n1p4]   75%    Linux Ext 4   /home
 5. Run 
 ```
-  $ curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/0-install-arch-base-stage-1.sh > 0-install-arch-base-stage-1.sh
-  $ chmod +x 0-install-arch-base-stage-1.sh
-  $ ./0-install-arch-base-stage-1.sh 
+  $ bash <(curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/0-install-arch-base-stage-1.sh)
 ```
 
