@@ -124,34 +124,37 @@ EOF
 
 create_stage2_script() {
   cat << EOF > /mnt/root/0-install-arch-base-stage-2.sh
-  # Time setup
-  ln -sf /usr/share/zoneinfo/Canada/Eastern /etc/localtime
-  hwclock --systohc        # generates /etc/adjtime
+#!/bin/bash
 
-  # Locale setpu
-  sed -i 's/#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
-  locale-gen
-  echo "LANG=en_US.UTF-8" > /etc/locale.conf
+# Time setup
+ln -sf /usr/share/zoneinfo/Canada/Eastern /etc/localtime
+hwclock --systohc        # generates /etc/adjtime
 
-  # More Packages
-  pacman -S --noconfirm ttf-dejavu gnu-free-fonts xorg-server xorg-xinit xf86-input-libinput xorg-server-common xorg-xclipboard xterm xclip dmenu i3-wm xfce4-terminal firefox
+# Locale setpu
+sed -i 's/#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
+locale-gen
+echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
-  # Change Root Passowrd
-  echo "root:${ARCH_ROOT_PASSWD}" | chpasswd
+# More Packages
+pacman -S --noconfirm ttf-dejavu gnu-free-fonts xorg-server xorg-xinit xf86-input-libinput xorg-server-common xorg-xclipboard xterm xclip dmenu i3-wm xfce4-terminal firefox
 
-  # Create Sudoers Group
-  sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
+# Change Root Passowrd
+echo "root:${ARCH_ROOT_PASSWD}" | chpasswd
 
-  # Create non-root user w. sudo access
-  useradd -m -G wheel -s /bin/bash $ARCH_USERNAME
-  echo "${ARCH_USERNAME}:${ARCH_USER_PASSWD}" | chpasswd
+# Create Sudoers Group
+sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 
-  # Setting up Daemons
-  systemctl enable iwd systemd-resolved systemd-timesyncd sshd
+# Create non-root user w. sudo access
+useradd -m -G wheel -s /bin/bash $ARCH_USERNAME
+echo "${ARCH_USERNAME}:${ARCH_USER_PASSWD}" | chpasswd
 
-  # Setup Bootloader
-  grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
-  grub-mkconfig -o /boot/grub/grub.cfg
+# Setting up Daemons
+systemctl enable iwd systemd-resolved systemd-timesyncd sshd
+
+# Setup Bootloader
+grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
+grub-mkconfig -o /boot/grub/grub.cfg
+
 EOF
 }
 
