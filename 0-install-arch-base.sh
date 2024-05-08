@@ -4,7 +4,7 @@ ARCH_VERSION=2024-04-01
 
 greeting() {
 
-cat <<"EOF"
+cat <<EOF
 
 Run script by: 
 bash <(curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/0-install-base.sh)  
@@ -156,6 +156,7 @@ grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
 grub-mkconfig -o /boot/grub/grub.cfg
 
 EOF
+chmod +x /mnt/root/0-install-arch-base-stage-2.sh
 }
 
 arch_install_complete() {
