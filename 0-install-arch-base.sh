@@ -134,7 +134,7 @@ create_stage2_script() {
   echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
   # More Packages
-  pacman -S --noconfirm ttf-dejavu gnu-free-fonts xorg-server xorg-xinit xf86-input-libinput xorg-server-common xorg-xclipboard xterm xclip dmenu i3-wm i3-status xfce4-terminal firefox
+  pacman -S --noconfirm ttf-dejavu gnu-free-fonts xorg-server xorg-xinit xf86-input-libinput xorg-server-common xorg-xclipboard xterm xclip dmenu i3-wm xfce4-terminal firefox
 
   # Change Root Passowrd
   echo "root:${ARCH_ROOT_PASSWD}" | chpasswd
