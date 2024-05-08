@@ -63,7 +63,9 @@ nonroot_user() {
    #passwd ${new_username}
    
    useradd -m -G wheel -s /bin/bash $ARCH_USERNAME
-   usermod --password $ARCH_USER_PASSWD $ARCH_USERNAME
+   #usermod --password $ARCH_USER_PASSWD $ARCH_USERNAME
+   echo "root:${ARCH_ROOT_PASSWD}" | chpasswd
+   echo "${ARCH_USERNAME}:${ARCH_USER_PASSWD}" | chpasswd
 }
 
 
