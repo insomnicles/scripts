@@ -27,12 +27,47 @@ Requirements
         /dev/sda3[nvme0n1p3]   4-8Gb  Linux Swap 
         /dev/sda4[nvme0n1p4]   75%    Linux Ext 4   /home
 
-  Continue only if the above have been done correctly.
+  Continue only if the above are satisfied.
 
   Press any key to continue. Ctrl-C to exit.
 EOF
 read cont
 
+}
+
+get_inputs() {
+  printf "\n\nEnter hostname:"
+  read inp_hostname
+
+  printf "\n\nEnter root password:"
+  read inp_root_passwd
+
+  printf "\n\nEnter user name:"
+  read inp_username
+
+  printf "\n\nEnter ${username} password:"
+  read inp_user_passwd
+
+  printf "\n\nEnter wifi network:\n"
+  #iwctl wlan0 get-networks
+  read inp_wifi
+
+  printf "\n\nEnter wifi password:\n"
+  read inp_wifi_passwd
+
+  export ARCH_HOSTNAME=${inp_hostname}
+  export ARCH_ROOT_PASSWD=${inp_root_passwd}
+  export ARCH_USERNAME=${inp_username}
+  export ARCH_USER_PASSWD=${inp_user_passwd}
+  export ARCH_WIFI_NETWORK=${inp_wifi}
+  export ARCH_WIFI_NETWORK_PASSWD=${inp_wifi_passwd}
+}
+
+wifi_setup() {
+  WLAN=`iwctl device list |grep wlan0 | wc -l`
+  if [ "${WLAN}" -eq 1 ]; then 
+     iwctl station wlan0 connect ${ARCH_WIFI_NETWORK} -p ${ARCH_WIFI_NETWORK_PASSWD}
+  fi
 }
 
 partition_setup() {
@@ -62,47 +97,6 @@ install_base_packages() {
    genfstab -U /mnt >> /mnt/etc/fstab
 }
 
-get_parameters() {
-  printf "\n\nEnter hostname:"
-  read inp_hostname
-
-  printf "\n\nEnter root password:"
-  read inp_root_passwd
-
-  printf "\n\nEnter user name:"
-  read inp_username
-
-  printf "\n\nEnter ${username} password:"
-  read inp_user_passwd
-
-  printf "\n\nEnter wifi network:\n"
-  iwctl wlan0 get-networks
-  read inp_wifi
-
-  printf "\n\nEnter wifi password:\n"
-  read inp_wifi_passwd
-
-  export ARCH_HOSTNAME=${inp_hostname}
-  export ARCH_ROOT_PASSWD=${inp_root_passwd}
-  export ARCH_USERNAME=${inp_username}
-  export ARCH_USER_PASSWD=${inp_user_passwd}
-  export ARCH_WIFI_NETWORK=${inp_wifi}
-  export ARCH_WIFI_NETWORK_PASSWD=${inp_wifi_passwd}
-}
-
-internet() {
-   WLAN=`iwctl device list |grep wlan0 | wc -l`
-   if [ "${WLAN}" -eq 1 ]; then 
-     iwctl station wlan0 connect ${ARCH_WIFI_NETWORK} -p ${ARCH_WIFI_NETWORK_PASSWD}
-   fi
-
-   printf "\n\nSetting up Resolv.conf\n" 
-   cp /mnt/etc/resolv.conf /mnt/etc/resolv.conf-bak
-   rm -f /mnt/etc/resolv.conf
-   cd /mnt/etc
-   ln -sf ../run/systemd/resolve/stub-resolv.conf resolv.conf
-}
-
 network_config() {
 
   echo $ARCH_HOSTNAME > /etc/hostname
@@ -116,21 +110,17 @@ DHCP=yes
 IgnoreCarrierLoss=3s
 EOF
 
-mkdir /etc/iwd
+mkdir /mnt/etc/iwd
 cat << "EOF" > /mnt/etc/iwd/main.conf
 [General]
 EnableNetworkConfiguration=true
 EOF
-}
 
-arch_install_complete() {
-  cat <<"EOF"
-Installation complete!
-
-- remove USB 
-- reboot the system or type reboot
-
-EOF
+  printf "\n\nSetting up Resolv.conf\n" 
+  cp /mnt/etc/resolv.conf /mnt/etc/resolv.conf-bak
+  rm -f /mnt/etc/resolv.conf
+  cd /mnt/etc
+  ln -sf ../run/systemd/resolve/stub-resolv.conf resolv.conf
 }
 
 create_stage2_script() {
@@ -164,12 +154,23 @@ create_stage2_script() {
 EOF
 }
 
+arch_install_complete() {
+  cat <<"EOF"
+Installation complete!
+
+- remove USB 
+- reboot the system or type reboot
+
+EOF
+}
+
 install_arch_base() {
    greeting
-   get_parameters
+   get_inputs
+   wifi_setup
    partition_setup
    install_base_packages
-   #download_stage2_script
+   network_config
    create_stage2_script
    arch-chroot /mnt bash /root/0-install-arch-base-stage-2.sh
    rm /mnt/root/0-install-arch-base-stage-2.sh
@@ -178,12 +179,3 @@ install_arch_base() {
 
 install_arch_base 
 
-
-# download_stage2_script() {
-#    curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/0-install-arch-base-stage-1.sh > /mnt/root/0-install-arch-base-stage-1.sh
-#    curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/0-install-arch-base-stage-2.sh > /mnt/root/0-install-arch-base-stage-2.sh
-#    chmod +x /mnt/root/0-install-arch-base-stage-1.sh
-#    chmod +x /mnt/root/0-install-arch-base-stage-2.sh
-# }
-#
-#

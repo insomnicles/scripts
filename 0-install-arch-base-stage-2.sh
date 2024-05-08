@@ -7,90 +7,30 @@ ARCH_USER_PASSWD=$4
 ARCH_WIFI_NETWORK=$5
 ARCH_WIFI_NETWORK_PASSWD=$6
 
-
-x11() {
-	declare -a pacs_X11=(
-    ttf-dejavu 
-    gnu-free-fonts
-		xorg-server 
-		xorg-xinit 
-		xf86-input-libinput 
-		xorg-server-common 
-		xorg-xclipboard 
-		xorg-wayland
-		xterm 
-		xclip
-		dmenu 
-		i3-wm
-		i3-status
-    xfce4-terminal
-		firefox
-	)
-	for value in "${pacs_X11[@]}"
-	do
-		pacman -S --needed --noconfirm $value
-	done
-}
-
-time_setup() {
-   ln -sf /usr/share/zoneinfo/Canada/Eastern /etc/localtime
-   hwclock --systohc        # generates /etc/adjtime
-}
-
-locale_setup() {
-   sed -i 's/#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
-   locale-gen
-   echo "LANG=en_US.UTF-8" > /etc/locale.conf
-}
-
-root_user() {
-   # printf "\n\nEnter Root password\n"
-   # passwd
-   usermod --password $ARCH_ROOT_PASSWD root
-}
-
-#v TODO: isudo in interactive mode
-sudoers() {
-    printf "\n\nSetting up sudoers wheel group\n"
-   sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
-}
-
-nonroot_user() {
-   # printf "\n\nEnter Regular User Name (user will have sudo access):\n"
-   # read new_username
-   #useradd -m -G wheel -s /bin/bash ${new_username}
-   #printf "\n\nEnter ${new_username} password\n"
-   #passwd ${new_username}
-   
-   useradd -m -G wheel -s /bin/bash $ARCH_USERNAME
-   #usermod --password $ARCH_USER_PASSWD $ARCH_USERNAME
-   echo "root:${ARCH_ROOT_PASSWD}" | chpasswd
-   echo "${ARCH_USERNAME}:${ARCH_USER_PASSWD}" | chpasswd
-}
-
-
-network_config() {
-  # echo "\n\nEnter hostname:\n"
-  # read new_hostname
-  #echo $new_hostname > /etc/hostname
-  echo $ARCH_HOSTNAME > /etc/hostname
-
-cat << "EOF" > /etc/systemd/network/25-wireless.network
-[Match]
-Name=wlan0
-
-[Network]
-DHCP=yes
-IgnoreCarrierLoss=3s
-EOF
-
-  mkdir /etc/iwd
-cat << "EOF" > /etc/iwd/main.conf
-[General]
-EnableNetworkConfiguration=true
-EOF
-
-}
+#
+# x11() {
+# 	declare -a pacs_X11=(
+#     ttf-dejavu 
+#     gnu-free-fonts
+# 		xorg-server 
+# 		xorg-xinit 
+# 		xf86-input-libinput 
+# 		xorg-server-common 
+# 		xorg-xclipboard 
+# 		xorg-wayland
+# 		xterm 
+# 		xclip
+# 		dmenu 
+# 		i3-wm
+# 		i3-status
+#     xfce4-terminal
+# 		firefox
+# 	)
+# 	for value in "${pacs_X11[@]}"
+# 	do
+# 		pacman -S --needed --noconfirm $value
+# 	done
+# }
 
 internet() {
    # ethernet should work out of the box
@@ -111,32 +51,6 @@ internet() {
    ln -sf ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
 }
 
-
-bootloader() {
-  #pacman -S --needed --noconfirm grub efibootmgr
-  printf "\n\n Setting up Bootloader\n"
-  grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
-  grub-mkconfig -o /boot/grub/grub.cfg
-}
-
-system_setup() {
-  printf "\n\n Setting up Daemons\n"
-  systemctl enable iwd                     # wifi/dhcp
-  systemctl enable systemd-resolved        # dns
-  systemctl enable systemd-timesyncd
-  systemctl enable sshd
-}
-
-arch_install_complete() {
-  cat <<"EOF"
-Installation complete!
-
-- remove USB 
-- reboot the system or type reboot
-
-EOF
-}
-
 install_arch_base_stage2() {
   echo $ARCH_HOSTNAME
   echo $ARCH_ROOT_PASSWD
@@ -145,7 +59,7 @@ install_arch_base_stage2() {
   echo $ARCH_WIFI_NETWORK
   echo $ARCH_WIFI_NETWORK_PASSWD
 
-  x11
+#  x11
   time_setup
   locale_setup
   network_config
