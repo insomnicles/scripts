@@ -7,8 +7,7 @@ greeting() {
 cat <<"EOF"
 
 Run script by: 
-bash < (curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/0-install-base.sh)  
-curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/0-install-base.sh | bash 
+bash <(curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/0-install-base.sh)  
 
 -----------------------------------------------------------------
 
@@ -125,8 +124,6 @@ EOF
 
 create_stage2_script() {
   cat << EOF > /mnt/root/0-install-arch-base-stage-2.sh
-
-
   # Time setup
   ln -sf /usr/share/zoneinfo/Canada/Eastern /etc/localtime
   hwclock --systohc        # generates /etc/adjtime
