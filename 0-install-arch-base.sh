@@ -93,7 +93,7 @@ EOF
 }
 
 install_base_packages() {
-   pacstrap -K /mnt base linux linux-firmware sof-firmware iwd man-db man-pages texinfo neovim vi base-devel sudo pacman-contrib intel-ucode grub efibootmgr git openssh zsh ttf-dejavu gnu-free-fonts xorg-server xorg-xinit xf86-input-libinput xorg-server-common xorg-xclipboard xterm xclip dmenu i3-wm i3-status xfce4-terminal firefox
+   pacstrap -K /mnt base linux linux-firmware sof-firmware iwd man-db man-pages texinfo neovim vi base-devel sudo pacman-contrib intel-ucode grub efibootmgr git openssh zsh 
    genfstab -U /mnt >> /mnt/etc/fstab
 }
 
@@ -126,6 +126,7 @@ EOF
 create_stage2_script() {
   cat << EOF > /mnt/root/0-install-arch-base-stage-2.sh
 
+
   # Time setup
   ln -sf /usr/share/zoneinfo/Canada/Eastern /etc/localtime
   hwclock --systohc        # generates /etc/adjtime
@@ -134,6 +135,9 @@ create_stage2_script() {
   sed -i 's/#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
   locale-gen
   echo "LANG=en_US.UTF-8" > /etc/locale.conf
+
+  # More Packages
+  pacman -S --no-confirm ttf-dejavu gnu-free-fonts xorg-server xorg-xinit xf86-input-libinput xorg-server-common xorg-xclipboard xterm xclip dmenu i3-wm i3-status xfce4-terminal firefox
 
   # Change Root Passowrd
   echo "root:${ARCH_ROOT_PASSWD}" | chpasswd
