@@ -1,6 +1,16 @@
 #!/bin/bash
-
+#
+#   Installation script for base ARCH Linux Installation 
+#    - include base packages
+#              base X11 packages
+#    roughly follows the Installation Guide 
+#
 ARCH_VERSION=2024-05-01
+TIME_ZONE="Canada/Eastern"
+LOCALE="en_US.UTF-8 UTF-8"
+BASE_PACS=""
+X11_PACS="ttf-dejavu gnu-free-fonts xorg-server xorg-xinit xf86-input-libinput xorg-server-common xorg-xclipboard xterm xclip dmenu i3-wm xfce4-terminal firefox"
+SYSTEMD_ENABLED="iwd systemd-resolved systemd-timesyncd sshd"
 
 greeting() {
 
@@ -33,45 +43,32 @@ read cont
 
 }
 
-get_inputs() {
+get_network_inputs() {
+
+  if [ "${WLAN}" -eq 1 ]; then 
+    printf "\n\nEnter wifi network:"
+    iwctl station wlan0 get-networks
+    read inp_wifi
+
+    printf "\n\nEnter wifi password:"
+    read inp_wifi_passwd
+
+    export ARCH_WIFI_NETWORK=${inp_wifi}
+    export ARCH_WIFI_NETWORK_PASSWD=${inp_wifi_passwd}
+  fi
+
   printf "\n\nEnter hostname:"
   read inp_hostname
-
-  printf "\n\nEnter root password:"
-  read inp_root_passwd
-
-  printf "\n\nEnter user name:"
-  read inp_username
-
-  printf "\n\nEnter ${inp_username} password:"
-  read inp_user_passwd
-
-  printf "\n\nEnter wifi network:\n"
-  WLAN=`iwctl device list | grep wlan0 | wc -l`
-  if [ "${WLAN}" -eq 1 ]; then 
-    iwctl station wlan0 get-networks
-  fi
-  read inp_wifi
-
-  printf "\n\nEnter wifi password:\n"
-  read inp_wifi_passwd
-
   export ARCH_HOSTNAME=${inp_hostname}
-  export ARCH_ROOT_PASSWD=${inp_root_passwd}
-  export ARCH_USERNAME=${inp_username}
-  export ARCH_USER_PASSWD=${inp_user_passwd}
-  export ARCH_WIFI_NETWORK=${inp_wifi}
-  export ARCH_WIFI_NETWORK_PASSWD=${inp_wifi_passwd}
 }
 
-wifi_setup() {
-  WLAN=`iwctl device list |grep wlan0 | wc -l`
+config_wifi() {
   if [ "${WLAN}" -eq 1 ]; then 
      iwctl station wlan0 connect ${ARCH_WIFI_NETWORK} -p ${ARCH_WIFI_NETWORK_PASSWD}
   fi
 }
 
-partition_setup() {
+create_partitions(){
 
   cat <<"EOF"
 Which partition do you want to setup: 
@@ -97,11 +94,10 @@ install_base_packages() {
    genfstab -U /mnt >> /mnt/etc/fstab
 }
 
-network_config() {
-
+config_network() {
   echo $ARCH_HOSTNAME > /mnt/etc/hostname
-
-  cat << "EOF" > /mnt/etc/systemd/network/25-wireless.network
+  if [ "${WLAN}" -eq 1 ]; then 
+    cat << "EOF" > /mnt/etc/systemd/network/25-wireless.network
 [Match]
 Name=wlan0
 
@@ -115,6 +111,7 @@ EOF
 [General]
 EnableNetworkConfiguration=true
 EOF
+  fi
 
   printf "\n\nSetting up Resolv.conf\n" 
   cp /mnt/etc/resolv.conf /mnt/etc/resolv.conf-bak
@@ -123,44 +120,51 @@ EOF
   ln -sf ../run/systemd/resolve/stub-resolv.conf resolv.conf
 }
 
-create_stage2_script() {
-  cat <<EOF > ./0-install-arch-base-stage-2.sh
-#!/bin/bash
-
-# Time setup
-ln -sf /usr/share/zoneinfo/Canada/Eastern /etc/localtime
-hwclock --systohc
-
-# Locale setpu
-sed -i 's/#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
-locale-gen
-echo "LANG=en_US.UTF-8" > /etc/locale.conf
-
-# More Packages
-pacman -S --noconfirm ttf-dejavu gnu-free-fonts xorg-server xorg-xinit xf86-input-libinput xorg-server-common xorg-xclipboard xterm xclip dmenu i3-wm xfce4-terminal firefox
-
-# Change Root Passowrd
-echo "root:${ARCH_ROOT_PASSWD}" | chpasswd
-
-# Create Sudoers Group
-sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
-
-# Create non-root user w. sudo access
-useradd -m -G wheel -s /bin/bash ${ARCH_USERNAME}
-echo "${ARCH_USERNAME}:${ARCH_USER_PASSWD}" | chpasswd
-
-# Setting up Daemons
-systemctl enable iwd systemd-resolved systemd-timesyncd sshd
-
-# Setup Bootloader
-grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
-grub-mkconfig -o /boot/grub/grub.cfg
-
-EOF
-  chmod +x ./0-install-arch-base-stage-2.sh
+config_time() {
+  arch-chroot /mnt ln -sf /usr/share/zoneinfo/${TIME_ZONE} /etc/localtime
+  arch-chroot /mnt hwclock --systohc
 }
 
-arch_install_complete() {
+config_locale() {
+  #sed -i 's/#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /mnt/etc/locale.gen
+  sed -i 's/#${LOCALE}/${LOCALE}/' /mnt/etc/locale.gen
+  arch-chroot /mnt locale-gen
+  echo "LANG=en_US.UTF-8" > /mnt/etc/locale.conf
+}
+
+install_x11_packages() {
+  arch-chroot /mnt pacman -S --noconfirm ${X11_PACS}
+  #ttf-dejavu gnu-free-fonts xorg-server xorg-xinit xf86-input-libinput xorg-server-common xorg-xclipboard xterm xclip dmenu i3-wm xfce4-terminal firefox
+}
+
+config_users() {
+  printf "\nChange Root Password\n"
+  arch-chroot /mnt passwd
+
+  printf "\nCreating Sudoers Group\n"
+  sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /mnt/etc/sudoers
+
+  printf "\nEnter non-root (sudo) username\n"
+  read inp_username
+  useradd -m -G wheel -s /bin/bash ${inp_username}
+  printf "\n\nUser Password\n"
+  passwd ${inp_username}
+}
+
+config_systemd() {
+  arch-chroot /mnt systemctl enable ${SYSTEMD_ENABLED}
+}
+
+install_bootloader() {
+  arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
+  arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
+}
+
+cleanup() {
+  cp /root/*.log /mnt/root
+}
+
+bye() {
   cat <<"EOF"
 
 Installation complete!
@@ -173,15 +177,32 @@ EOF
 
 install_arch_base() {
    greeting
-   get_inputs
-   wifi_setup
-   partition_setup
+
+   get_network_inputs
+
+   config_wifi
+
+   create_partitions
+
    install_base_packages
-   network_config
-   create_stage2_script
-   arch-chroot /mnt /root/0-install-arch-base-stage-2.sh
-   rm /mnt/root/0-install-arch-base-stage-2.sh
-   arch_install_complete
+   
+   config_network
+
+   config_time
+   
+   config_locale
+
+   install_x11_packages
+
+   config_users
+
+   config_systemd
+
+   install_bootloader
+
+   cleanup
+
+   bye
 }
 
 install_arch_base 2> ./install-error.log | tee ./install-output.log 
