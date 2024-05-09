@@ -5,7 +5,16 @@
 #              base X11 packages
 #    roughly follows the Installation Guide 
 #
+UEFI_MODE=0
 ARCH_VERSION=2024-05-01
+
+DSK_UEFI_SIZE=1G
+DSK_ROOT_SIZE=5G
+DSK_SWAP_SIZE=1G
+DSK_HOME_SIZE=2G
+
+HOSTNAME=
+
 TIME_ZONE="Canada/Eastern"
 LOCALE="en_US.UTF-8 UTF-8"
 BASE_PACS=""
@@ -43,6 +52,16 @@ read cont
 
 }
 
+boot_mode() {
+  if [[ -d /sys/firmware/efi/efivars ]]; then
+    export UEFI_MODE=0
+  else
+    export UEFI_MODE=1
+    echo "Not in UEFI Mode: boot into UEFI mode"
+    exit
+  fi
+}
+
 get_network_inputs() {
 
   if [ "${WLAN}" -eq 1 ]; then 
@@ -66,18 +85,42 @@ config_wifi() {
   if [ "${WLAN}" -eq 1 ]; then 
      iwctl station wlan0 connect ${ARCH_WIFI_NETWORK} -p ${ARCH_WIFI_NETWORK_PASSWD}
   fi
+
+  echo -e "\n\nTesting internet connection..."
+  $(ping -c 3 archlinux.org &>/dev/null) || (echo "Not Connected to Network!!!" && exit 1)
+  echo "Good!  We're connected!!!" && sleep 3
 }
 
 create_partitions(){
+  if [[ $IN_DEVICE =~ nvme ]]; then
+    EFI_DEVICE="${IN_DEVICE}p1"   # NOT for MBR systems
+    ROOT_DEVICE="${IN_DEVICE}p2"  # only for non-LVM
+    SWAP_DEVICE="${IN_DEVICE}p3"  # only for non-LVM 
+    HOME_DEVICE="${IN_DEVICE}p4"  # only for non-LVM
+  else
+    EFI_DEVICE="${IN_DEVICE}1"   # NOT for MBR systems
+    ROOT_DEVICE="${IN_DEVICE}2"  # only for non-LVM
+    SWAP_DEVICE="${IN_DEVICE}3"  # only for non-LVM 
+    HOME_DEVICE="${IN_DEVICE}4"  # only for non-LVM
+  fi
 
-  cat <<"EOF"
+  if [ "${UEFI_MODE}" -eq 1 ]; then
+    lsblk 
+    cat <<"EOF"
 Which partition do you want to setup: 
 nvme0n1p [Desktop]
 sda      [Laptop]
 
 Type One of the above exactly: 
 EOF
-   read dsk
+    read IN_DEVICE
+    sgdisk -Z "$IN_DEVICE"
+    sgdisk -n 1::+"$DISK_EFI_SIZE" -t 1:ef00 -c 1:EFI "$IN_DEVICE"
+    sgdisk -n 2::+"$DISK_ROOT_SIZE" -t 2:8300 -c 2:ROOT "$IN_DEVICE"
+    sgdisk -n 3::+"$DISK_SWAP_SIZE" -t 3:8200 -c 3:SWAP "$IN_DEVICE"
+    sgdisk -n 4::+"$DISK_HOME_SIZE" -t 3:8300 -c 4:HOME "$IN_DEVICE"
+    #sgdisk -n 4 -c 4:HOME "$IN_DEVICE"
+  fi 
 
    mkfs.fat -F 32 /dev/${dsk}1             # formatting efi boot partition
    mkfs.ext4 /dev/${dsk}2                  # formatting root partition
@@ -177,9 +220,8 @@ EOF
 
 install_arch_base() {
    greeting
-
+   boot_mode
    get_network_inputs
-
    config_wifi
 
    create_partitions
