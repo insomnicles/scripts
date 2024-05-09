@@ -17,7 +17,7 @@ HOSTNAME=
 
 TIME_ZONE="Canada/Eastern"
 LOCALE="en_US.UTF-8 UTF-8"
-BASE_PACS=""
+BASE_PACS="base linux linux-firmware sof-firmware iwd man-db man-pages texinfo neovim vi base-devel sudo pacman-contrib intel-ucode grub efibootmgr git openssh zsh"
 X11_PACS="ttf-dejavu gnu-free-fonts xorg-server xorg-xinit xf86-input-libinput xorg-server-common xorg-xclipboard xterm xclip dmenu i3-wm xfce4-terminal firefox"
 SYSTEMD_ENABLED="iwd systemd-resolved systemd-timesyncd sshd"
 
@@ -92,17 +92,7 @@ config_wifi() {
 }
 
 create_partitions(){
-  # if [[ $IN_DEVICE =~ nvme ]]; then
-  #   EFI_DEVICE="${IN_DEVICE}p1"   # NOT for MBR systems
-  #   ROOT_DEVICE="${IN_DEVICE}p2"  # only for non-LVM
-  #   SWAP_DEVICE="${IN_DEVICE}p3"  # only for non-LVM 
-  #   HOME_DEVICE="${IN_DEVICE}p4"  # only for non-LVM
-  # else
-  #   EFI_DEVICE="${IN_DEVICE}1"   # NOT for MBR systems
-  #   ROOT_DEVICE="${IN_DEVICE}2"  # only for non-LVM
-  #   SWAP_DEVICE="${IN_DEVICE}3"  # only for non-LVM 
-  #   HOME_DEVICE="${IN_DEVICE}4"  # only for non-LVM
-  # fi
+
 
   if [ "${UEFI_MODE}" -eq 1 ]; then
     lsblk 
@@ -115,6 +105,19 @@ Type One of the above exactly:
 EOF
     read IN_DEVICE
     IN_DEVICE=/dev/${IN_DEVICE}
+
+  #  if [[ $IN_DEVICE =~ nvme ]]; then
+  #    $PART_EFI_DEVICE="${IN_DEVICE}p1"   # NOT for MBR systems
+  #   ROOT_DEVICE="${IN_DEVICE}p2"  # only for non-LVM
+  #   SWAP_DEVICE="${IN_DEVICE}p3"  # only for non-LVM 
+  #   HOME_DEVICE="${IN_DEVICE}p4"  # only for non-LVM
+  # else
+  #   EFI_DEVICE="${IN_DEVICE}1"   # NOT for MBR systems
+  #   ROOT_DEVICE="${IN_DEVICE}2"  # only for non-LVM
+  #   SWAP_DEVICE="${IN_DEVICE}3"  # only for non-LVM 
+  #   HOME_DEVICE="${IN_DEVICE}4"  # only for non-LVM
+  # fi
+
     sgdisk -Z "$IN_DEVICE"
     sgdisk -n 1::+"$PART_EFI_SIZE" -t 1:ef00 -c 1:EFI "$IN_DEVICE"
     sgdisk -n 2::+"$PART_ROOT_SIZE" -t 2:8300 -c 2:ROOT "$IN_DEVICE"
@@ -134,7 +137,7 @@ EOF
 }
 
 install_base_packages() {
-   pacstrap -K /mnt base linux linux-firmware sof-firmware iwd man-db man-pages texinfo neovim vi base-devel sudo pacman-contrib intel-ucode grub efibootmgr git openssh zsh 
+   pacstrap -K /mnt ${BASE_PACS}
    genfstab -U /mnt >> /mnt/etc/fstab
 }
 
@@ -149,9 +152,8 @@ Name=wlan0
 DHCP=yes
 IgnoreCarrierLoss=3s
 EOF
-
-  mkdir -p /mnt/etc/iwd
-  cat << "EOF" > /mnt/etc/iwd/main.conf
+    mkdir -p /mnt/etc/iwd
+    cat << "EOF" > /mnt/etc/iwd/main.conf
 [General]
 EnableNetworkConfiguration=true
 EOF
@@ -190,12 +192,14 @@ config_users() {
 
   printf "\nEnter non-root (sudo) username\n"
   read inp_username
-  useradd -m -G wheel -s /bin/bash ${inp_username}
+  arch-chroot /mnt useradd -m -G wheel -s /bin/bash ${inp_username}
+
   printf "\n\nUser Password\n"
-  passwd ${inp_username}
+  arch-chroot /mnt passwd ${inp_username}
 }
 
 config_systemd() {
+  printf "\nSetting up Systemd\n"
   arch-chroot /mnt systemctl enable ${SYSTEMD_ENABLED}
 }
 
