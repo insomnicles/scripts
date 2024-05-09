@@ -1,10 +1,10 @@
 #!/bin/bash
 
-ARCH_VERSION=2024-04-01
+ARCH_VERSION=2024-05-01
 
 greeting() {
 
-cat <<EOF
+  cat <<EOF
 
 Run script by: 
 bash <(curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/0-install-base.sh)  
@@ -12,8 +12,6 @@ bash <(curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/0-inst
 -----------------------------------------------------------------
 
 Hi, Arch Linux Install Begins.
-
------------------------------------------------------------------
 
 ARCH VERSION: ${ARCH_VERSION}
 
@@ -29,6 +27,7 @@ Requirements
   Continue only if the above are satisfied.
 
   Press any key to continue. Ctrl-C to exit.
+
 EOF
 read cont
 
@@ -44,11 +43,14 @@ get_inputs() {
   printf "\n\nEnter user name:"
   read inp_username
 
-  printf "\n\nEnter ${username} password:"
+  printf "\n\nEnter ${inp_username} password:"
   read inp_user_passwd
 
   printf "\n\nEnter wifi network:\n"
-  #iwctl wlan0 get-networks
+  WLAN=`iwctl device list | grep wlan0 | wc -l`
+  if [ "${WLAN}" -eq 1 ]; then 
+    iwctl station wlan0 get-networks
+  fi
   read inp_wifi
 
   printf "\n\nEnter wifi password:\n"
@@ -72,7 +74,6 @@ wifi_setup() {
 partition_setup() {
 
   cat <<"EOF"
-
 Which partition do you want to setup: 
 nvme0n1p [Desktop]
 sda      [Laptop]
@@ -98,7 +99,7 @@ install_base_packages() {
 
 network_config() {
 
-  echo $ARCH_HOSTNAME > /etc/hostname
+  echo $ARCH_HOSTNAME > /mnt/etc/hostname
 
   cat << "EOF" > /mnt/etc/systemd/network/25-wireless.network
 [Match]
@@ -109,8 +110,8 @@ DHCP=yes
 IgnoreCarrierLoss=3s
 EOF
 
-mkdir /mnt/etc/iwd
-cat << "EOF" > /mnt/etc/iwd/main.conf
+  mkdir -p /mnt/etc/iwd
+  cat << "EOF" > /mnt/etc/iwd/main.conf
 [General]
 EnableNetworkConfiguration=true
 EOF
@@ -123,12 +124,12 @@ EOF
 }
 
 create_stage2_script() {
-  cat << EOF > /mnt/root/0-install-arch-base-stage-2.sh
+  cat <<EOF > ./0-install-arch-base-stage-2.sh
 #!/bin/bash
 
 # Time setup
 ln -sf /usr/share/zoneinfo/Canada/Eastern /etc/localtime
-hwclock --systohc        # generates /etc/adjtime
+hwclock --systohc
 
 # Locale setpu
 sed -i 's/#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
@@ -145,7 +146,7 @@ echo "root:${ARCH_ROOT_PASSWD}" | chpasswd
 sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 
 # Create non-root user w. sudo access
-useradd -m -G wheel -s /bin/bash $ARCH_USERNAME
+useradd -m -G wheel -s /bin/bash ${ARCH_USERNAME}
 echo "${ARCH_USERNAME}:${ARCH_USER_PASSWD}" | chpasswd
 
 # Setting up Daemons
@@ -156,11 +157,12 @@ grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
 grub-mkconfig -o /boot/grub/grub.cfg
 
 EOF
-chmod +x /mnt/root/0-install-arch-base-stage-2.sh
+  chmod +x ./0-install-arch-base-stage-2.sh
 }
 
 arch_install_complete() {
   cat <<"EOF"
+
 Installation complete!
 
 - remove USB 
@@ -182,5 +184,5 @@ install_arch_base() {
    arch_install_complete
 }
 
-install_arch_base 
+install_arch_base 2> ./install-error.log | tee ./install-output.log 
 
