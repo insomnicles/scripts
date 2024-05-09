@@ -119,7 +119,7 @@ EOF
   # fi
 
     sgdisk -Z "$IN_DEVICE"
-    sgdisk -n 1::+"$PART_EFI_SIZE" -t 1:ef00 -c 1:EFI "$IN_DEVICE"
+    sgdisk -n 1::+"$PART_UEFI_SIZE" -t 1:ef00 -c 1:EFI "$IN_DEVICE"
     sgdisk -n 2::+"$PART_ROOT_SIZE" -t 2:8300 -c 2:ROOT "$IN_DEVICE"
     sgdisk -n 3::+"$PART_SWAP_SIZE" -t 3:8200 -c 3:SWAP "$IN_DEVICE"
     sgdisk -n 4::+"$PART_HOME_SIZE" -t 3:8300 -c 4:HOME "$IN_DEVICE"
