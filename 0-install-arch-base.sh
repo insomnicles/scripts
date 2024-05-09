@@ -8,10 +8,10 @@
 UEFI_MODE=0
 ARCH_VERSION=2024-05-01
 
-DSK_UEFI_SIZE=1G
-DSK_ROOT_SIZE=5G
-DSK_SWAP_SIZE=1G
-DSK_HOME_SIZE=2G
+PART_UEFI_SIZE=1G
+PART_ROOT_SIZE=5G
+PART_SWAP_SIZE=1G
+PART_HOME_SIZE=2G
 
 HOSTNAME=
 
@@ -116,10 +116,10 @@ EOF
     read IN_DEVICE
     IN_DEVICE=/dev/${IN_DEVICE}
     sgdisk -Z "$IN_DEVICE"
-    sgdisk -n 1::+"$DISK_EFI_SIZE" -t 1:ef00 -c 1:EFI "$IN_DEVICE"
-    sgdisk -n 2::+"$DISK_ROOT_SIZE" -t 2:8300 -c 2:ROOT "$IN_DEVICE"
-    sgdisk -n 3::+"$DISK_SWAP_SIZE" -t 3:8200 -c 3:SWAP "$IN_DEVICE"
-    sgdisk -n 4::+"$DISK_HOME_SIZE" -t 3:8300 -c 4:HOME "$IN_DEVICE"
+    sgdisk -n 1::+"$PART_EFI_SIZE" -t 1:ef00 -c 1:EFI "$IN_DEVICE"
+    sgdisk -n 2::+"$PART_ROOT_SIZE" -t 2:8300 -c 2:ROOT "$IN_DEVICE"
+    sgdisk -n 3::+"$PART_SWAP_SIZE" -t 3:8200 -c 3:SWAP "$IN_DEVICE"
+    sgdisk -n 4::+"$PART_HOME_SIZE" -t 3:8300 -c 4:HOME "$IN_DEVICE"
     #sgdisk -n 4 -c 4:HOME "$IN_DEVICE"
   fi 
 
