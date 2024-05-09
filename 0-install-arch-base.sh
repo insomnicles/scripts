@@ -54,9 +54,9 @@ read cont
 
 boot_mode() {
   if [[ -d /sys/firmware/efi/efivars ]]; then
-    export UEFI_MODE=0
-  else
     export UEFI_MODE=1
+  else
+    export UEFI_MODE=0
     echo "Not in UEFI Mode: boot into UEFI mode"
     exit
   fi
@@ -92,17 +92,17 @@ config_wifi() {
 }
 
 create_partitions(){
-  if [[ $IN_DEVICE =~ nvme ]]; then
-    EFI_DEVICE="${IN_DEVICE}p1"   # NOT for MBR systems
-    ROOT_DEVICE="${IN_DEVICE}p2"  # only for non-LVM
-    SWAP_DEVICE="${IN_DEVICE}p3"  # only for non-LVM 
-    HOME_DEVICE="${IN_DEVICE}p4"  # only for non-LVM
-  else
-    EFI_DEVICE="${IN_DEVICE}1"   # NOT for MBR systems
-    ROOT_DEVICE="${IN_DEVICE}2"  # only for non-LVM
-    SWAP_DEVICE="${IN_DEVICE}3"  # only for non-LVM 
-    HOME_DEVICE="${IN_DEVICE}4"  # only for non-LVM
-  fi
+  # if [[ $IN_DEVICE =~ nvme ]]; then
+  #   EFI_DEVICE="${IN_DEVICE}p1"   # NOT for MBR systems
+  #   ROOT_DEVICE="${IN_DEVICE}p2"  # only for non-LVM
+  #   SWAP_DEVICE="${IN_DEVICE}p3"  # only for non-LVM 
+  #   HOME_DEVICE="${IN_DEVICE}p4"  # only for non-LVM
+  # else
+  #   EFI_DEVICE="${IN_DEVICE}1"   # NOT for MBR systems
+  #   ROOT_DEVICE="${IN_DEVICE}2"  # only for non-LVM
+  #   SWAP_DEVICE="${IN_DEVICE}3"  # only for non-LVM 
+  #   HOME_DEVICE="${IN_DEVICE}4"  # only for non-LVM
+  # fi
 
   if [ "${UEFI_MODE}" -eq 1 ]; then
     lsblk 
@@ -114,6 +114,7 @@ sda      [Laptop]
 Type One of the above exactly: 
 EOF
     read IN_DEVICE
+    IN_DEVICE=/dev/${IN_DEVICE}
     sgdisk -Z "$IN_DEVICE"
     sgdisk -n 1::+"$DISK_EFI_SIZE" -t 1:ef00 -c 1:EFI "$IN_DEVICE"
     sgdisk -n 2::+"$DISK_ROOT_SIZE" -t 2:8300 -c 2:ROOT "$IN_DEVICE"
@@ -122,14 +123,14 @@ EOF
     #sgdisk -n 4 -c 4:HOME "$IN_DEVICE"
   fi 
 
-   mkfs.fat -F 32 /dev/${dsk}1             # formatting efi boot partition
-   mkfs.ext4 /dev/${dsk}2                  # formatting root partition
-   mkswap /dev/${dsk}3                     # creating swap partition
+   mkfs.fat -F 32 ${IN_DEVICE}1             # formatting efi boot partition
+   mkfs.ext4 ${IN_DEVICE}2                  # formatting root partition
+   mkswap ${IN_DEVICE}3                     # creating swap partition
 
-   mount --mkdir /dev/${dsk}2 /mnt         # mounting /
-   mount --mkdir /dev/${dsk}1 /mnt/boot    # mounting /boot
-   mount --mkdir /dev/${dsk}4 /mnt/home    # mounting /home
-   swapon /dev/${dsk}3                     # swap on
+   mount --mkdir ${IN_DEVICE}2 /mnt         # mounting /
+   mount --mkdir ${IN_DEVICE}1 /mnt/boot    # mounting /boot
+   mount --mkdir ${IN_DEVICE}4 /mnt/home    # mounting /home
+   swapon ${IN_DEVICE}3                     # swap on
 }
 
 install_base_packages() {
