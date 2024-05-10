@@ -75,7 +75,6 @@ config_wifi() {
 
 create_partitions(){
 
-
   if [ "${UEFI_MODE}" -eq 1 ]; then
     lsblk 
     cat <<"EOF"
@@ -87,18 +86,22 @@ EOF
     read IN_DEVICE
     IN_DEVICE=/dev/${IN_DEVICE}
 
-    DEVICE_SIZE=sfdisk -s $IN_DEVICE
-    DEVICE_MB=`expr ${DEVICE_SIZE} / 2195312   5048`
-    DEVICE_GB=`expr ${DEVICE_MB} / 1000`
-    DEVICE_SIZE=`lsblk | grep ^sda | awk '{ print $1 $4 }' | cut -d G -f 1`
-
+    #DEVICE_SIZE=sfdisk -s $IN_DEVICE
+    # DEVICE_MB=`expr ${DEVICE_SIZE} / 2195312   5048`
+    # DEVICE_GB=`expr ${DEVICE_MB} / 1000`
+    DEVICE_SIZE_GB=`lsblk | grep ^sda | awk '{ print $4 }' | cut -d G -f 1`
     MEM_SIZE_GB=`free -g -h -t | grep Mem | awk '{print $2}' |cut -dG -f 1`
-    MEM_SIZE_KB=`cat /proc/meminfo |grep MemTotal | cut -d ":" -f 2 | cut -d "k" -f 1 | awk '{$1=$1};1'`  # in KB / 343
+    #MEM_SIZE_KB=`cat /proc/meminfo |grep MemTotal | cut -d ":" -f 2 | cut -d "k" -f 1 | awk '{$1=$1};1'`  # in KB / 343
     MIN_ROOT_GB=8
     MAX_ROOT_GB=100
 
     $PART_UEFI_SIZE=1G
     $PART_SWAP_SIZE=`expr $MEM_SIZE_GB * 1.5`"G"
+   
+    echo $DEVICE_SIZE_GB
+    echo $MEM_SIZE_GB
+    echo $PART_UEFI_SIZE
+    echo $PART_SWAP_SIZE
 
     $DEVICE_LEFT=`expr $MEM_ - $MEM`
     if [[ "$DEVICE_GB" -lt "$MIN_ROOT" ]]; then
@@ -238,22 +241,22 @@ EOF
 }
 
 install_arch_base() {
-   greeting
-   boot_mode
-   get_network_inputs
-   config_wifi
+   # greeting
+   # boot_mode
+   # get_network_inputs
+   # config_wifi
    create_partitions
-   install_base_packages
-   config_network
-   config_time
-   config_locale
-   install_x11_packages
-   config_users
-   config_systemd
-   kernel_modules
-   install_bootloader
-   cleanup
-   bye
+   # install_base_packages
+   # config_network
+   # config_time
+   # config_locale
+   # install_x11_packages
+   # config_users
+   # config_systemd
+   # kernel_modules
+   # install_bootloader
+   # cleanup
+   # bye
 }
 
 install_arch_base 2> ./install-error.log 
