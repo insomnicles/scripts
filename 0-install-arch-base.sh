@@ -6,13 +6,7 @@
 #    roughly follows the Installation Guide 
 #
 
-UEFI_MODE=0
 ARCH_VERSION=2024-05-01
-
-PART_UEFI_SIZE=1G
-PART_ROOT_SIZE=5G
-PART_SWAP_SIZE=1G
-PART_HOME_SIZE=2G
 
 TIME_ZONE="Canada/Eastern"
 LOCALE="en_US.UTF-8 UTF-8"
@@ -35,10 +29,7 @@ read cont
 }
 
 boot_mode() {
-  if [[ -d /sys/firmware/efi/efivars ]]; then
-    export UEFI_MODE=1
-  else
-    export UEFI_MODE=0
+  if [[ ! -d /sys/firmware/efi/efivars ]]; then
     echo "Not in UEFI Mode: boot into UEFI mode"
     exit
   fi
@@ -69,8 +60,8 @@ config_wifi() {
   fi
 
   echo -e "\nTesting internet connection..."
-  $(ping -c 3 archlinux.org &>/dev/null) || (echo "Not Connected to Network!!!" && exit 1)
-  echo "Good!  We're connected!!!" && sleep 3
+  $(ping -c 3 archlinux.org &>/dev/null) || (echo "Not Connected to Network!" && exit 1)
+  echo "Connected to the Internet." && sleep 3
 }
 
 create_partitions(){
@@ -79,73 +70,62 @@ create_partitions(){
     lsblk 
     cat <<"EOF"
 Enter the device you want to Install Arch on:
-e.g. nvme0n1 or sda
-
 Type One of the above exactly: 
 EOF
-    read IN_DEVICE
-    IN_DEVICE=/dev/${IN_DEVICE}
+    read DEV
+    IN_DEVICE=/dev/${DEV}
 
     #DEVICE_SIZE=sfdisk -s $IN_DEVICE
-    # DEVICE_MB=`expr ${DEVICE_SIZE} / 2195312   5048`
-    # DEVICE_GB=`expr ${DEVICE_MB} / 1000`
-    DEVICE_SIZE_GB=`lsblk | grep ^sda | awk '{ print $4 }' | cut -d G -f 1`
+    DEVICE_SIZE_GB=`lsblk | awk '{ print $4 }' | cut -d G -f 1`
     MEM_SIZE_GB=`free -g -h -t | grep Mem | awk '{print $2}' |cut -dG -f 1`
+
     #MEM_SIZE_KB=`cat /proc/meminfo |grep MemTotal | cut -d ":" -f 2 | cut -d "k" -f 1 | awk '{$1=$1};1'`  # in KB / 343
-    MIN_ROOT_GB=8
-    MAX_ROOT_GB=100
 
-    $PART_UEFI_SIZE=1G
-    $PART_SWAP_SIZE=`expr $MEM_SIZE_GB * 1.5`"G"
-   
-    echo $DEVICE_SIZE_GB
+    $PART_BOOT_SIZE=1
+
     echo $MEM_SIZE_GB
-    echo $PART_UEFI_SIZE
-    echo $PART_SWAP_SIZE
+    printf "UEFI: ${PART_UEFI_SIZE} Gb\n
+            SWAP: ?\n
+            ROOT: ? \n
+            HOME: remaining \n"
 
-    $DEVICE_LEFT=`expr $MEM_ - $MEM`
-    if [[ "$DEVICE_GB" -lt "$MIN_ROOT" ]]; then
-      echo "Insufficient Space"
-      exit
-    else if [[ "$DEVICE_GB" -gt "$MAX_ROOT_GB" ]]; then
-      $PART_ROOT_SIZE=$MAX_ROOT_SIZE
-    else 
-      $PART_ROOT_SIZE=$MAX_ROOT_SIZE
-    fi
-    # ROOT: min 4G; max: 50G
-    # HOME: LEFT
+    echo "Enter Swap Partition Size in Gb"
+    read PART_SWAP_SIZE
+
+    echo "Enter Root Partition Size in Gb"
+    read PART_ROOT_SIZE
 
     if [[ $IN_DEVICE =~ nvme ]]; then
-      $PART_UEFI="${IN_DEVICE}p1"
-      $PART_ROOT="${IN_DEVICE}p2"
-      $PART_SWAP="${IN_DEVICE}p3" 
-      $PART_HOME="${IN_DEVICE}p4"
-    else if [[ $IN_DEVICE == 'sda' ]]; then
-      $PART_UEFI="${IN_DEVICE}1"
-      $PART_ROOT="${IN_DEVICE}2"
-      $PART_SWAP="${IN_DEVICE}3"  
-      $PART_HOME="${IN_DEVICE}4" 
+      PART_BOOT="${IN_DEVICE}p1"
+      PART_ROOT="${IN_DEVICE}p2"
+      PART_SWAP="${IN_DEVICE}p3" 
+      PART_HOME="${IN_DEVICE}p4"
+    elif [[ $IN_DEVICE == 'sda' ]]; then
+      PART_BOOT="${IN_DEVICE}1"
+      PART_ROOT="${IN_DEVICE}2"
+      PART_SWAP="${IN_DEVICE}3"  
+      PART_HOME="${IN_DEVICE}4" 
     else
       echo "Device not recognized" && exit
     fi
 
     sgdisk -Z "$IN_DEVICE"
-    sgdisk -n 1::+"$PART_UEFI_SIZE" -t 1:ef00 -c 1:EFI "$IN_DEVICE"
+    sgdisk -n 1::+"$PART_BOOT_SIZE" -t 1:ef00 -c 1:EFI "$IN_DEVICE"
     sgdisk -n 2::+"$PART_ROOT_SIZE" -t 2:8300 -c 2:ROOT "$IN_DEVICE"
     sgdisk -n 3::+"$PART_SWAP_SIZE" -t 3:8200 -c 3:SWAP "$IN_DEVICE"
     sgdisk -n 4 -c 4:HOME "$IN_DEVICE"
     #sgdisk -n 4::+"$PART_HOME_SIZE" -t 3:8300 -c 4:HOME "$IN_DEVICE"
   fi 
 
-   mkfs.fat -F 32 ${IN_DEVICE}1
-   mkfs.ext4 ${IN_DEVICE}2
-   mkswap ${IN_DEVICE}3
-   mkfs.ext4 ${IN_DEVICE}4
+   mkfs.fat -F 32 ${PART_BOOT}
+   mkfs.ext4 ${PART_ROOT}
+   mkswap ${PART_SWAP}
+   mkfs.ext4 ${PART_HOME}
 
-   mount --mkdir ${IN_DEVICE}2 /mnt         # mounting /
-   mount --mkdir ${IN_DEVICE}1 /mnt/boot    # mounting /boot
-   mount --mkdir ${IN_DEVICE}4 /mnt/home    # mounting /home
-   swapon ${IN_DEVICE}3                     # swap on
+   mount --mkdir ${PART_ROOT} /mnt          # mounting /
+   mount --mkdir ${PART_BOOT} /mnt/boot     # mounting /boot
+   mount --mkdir ${PART_HOME /mnt/home      # mounting /home
+   swapon ${PART_SWAP}                      # swap on
 }
 
 install_base_packages() {
