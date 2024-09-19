@@ -36,29 +36,12 @@ boot_mode() {
 }
 
 get_network_inputs() {
-
-  if [ "${WLAN}" -eq 1 ]; then 
-    printf "\n\nEnter wifi network:"
-    iwctl station wlan0 get-networks
-    read inp_wifi
-
-    printf "\n\nEnter wifi password:"
-    read inp_wifi_passwd
-
-    export ARCH_WIFI_NETWORK=${inp_wifi}
-    export ARCH_WIFI_NETWORK_PASSWD=${inp_wifi_passwd}
-  fi
-
   printf "\nEnter hostname:"
   read inp_hostname
   export ARCH_HOSTNAME=${inp_hostname}
 }
 
 config_wifi() {
-  if [ "${WLAN}" -eq 1 ]; then 
-     iwctl station wlan0 connect ${ARCH_WIFI_NETWORK} -p ${ARCH_WIFI_NETWORK_PASSWD}
-  fi
-
   echo -e "\nTesting internet connection..."
   $(ping -c 3 archlinux.org &>/dev/null) || (echo "Not Connected to Network!" && exit 1)
   echo "Connected to the Internet." && sleep 3
@@ -73,28 +56,6 @@ Type One of the above exactly:
 EOF
    read DEV
    IN_DEVICE=/dev/${DEV}
-
-   #DEVICE_SIZE=sfdisk -s $IN_DEVICE
-   DEVICE_SIZE_GB=`lsblk | grep 'sda\|nvme' | awk '{ print $4 }' | cut -d G -f 1`
-   MEM_SIZE_GB=`free -g -h -t | grep Mem | awk '{print $2}' |cut -dG -f 1`
-
-
-   PART_BOOT_SIZE=1
-
-   printf "\nDevice Size: "
-   lsblk | grep 'sda\|nvme' 
-   printf "\nMemory Size: $MEM_SIZE_GB\n"
-   printf "UEFI: ${PART_BOOT_SIZE} Gb\n
-            SWAP: ?\n
-            ROOT: ? \n
-            HOME: all space remaining \n"
-
-   echo "Enter Swap Partition Size in Gb"
-   read PART_SWAP_SIZE
-
-   echo "Enter Root Partition Size in Gb"
-   read PART_ROOT_SIZE
-
    if [[ $IN_DEVICE =~ nvme ]]; then
      PART_BOOT="${IN_DEVICE}p1"
      PART_ROOT="${IN_DEVICE}p2"
@@ -109,23 +70,63 @@ EOF
      echo "Device not recognized" && exit
    fi
 
-   sgdisk -Z "$IN_DEVICE"
-   sgdisk -n 1::+"$PART_BOOT_SIZE"G -t 1:ef00 -c 1:EFI "$IN_DEVICE"
-   sgdisk -n 2::+"$PART_ROOT_SIZE"G -t 2:8300 -c 2:ROOT "$IN_DEVICE"
-   sgdisk -n 3::+"$PART_SWAP_SIZE"G -t 3:8200 -c 3:SWAP "$IN_DEVICE"
-   sgdisk -n 4 -c 4:HOME "$IN_DEVICE"
-   #sgdisk -n 4::+"$PART_HOME_SIZE" -t 3:8300 -c 4:HOME "$IN_DEVICE"
+   cat <<"EOF"
+
+Do you want to 
+1. create all new partitions?
+2. keep existing partitions (root partition will be eraased)?
+
+EOF
+   read INST_TYPE
+
+   if [ ${INST_TYPE} -eq 1 ]; then 
+      printf "\nCreating all new partions\n"
+   	#DEVICE_SIZE=sfdisk -s $IN_DEVICE
+	    DEVICE_SIZE_GB=`lsblk | grep 'sda\|nvme' | awk '{ print $4 }' | cut -d G -f 1`
+    	MEM_SIZE_GB=`free -g -h -t | grep Mem | awk '{print $2}' |cut -dG -f 1`
+    	PART_BOOT_SIZE=1
+
+    	printf "\nDevice Size: "
+    	lsblk | grep 'sda\|nvme' 
+	cat <<EOF
+Memory Size: $MEM_SIZE_GB
+UEFI: ${PART_BOOT_SIZE} Gb
+SWAP: ?
+ROOT: ? 
+HOME: all space remaining 
+EOF
+      echo "Enter Swap Partition Size in Gb"
+	    read PART_SWAP_SIZE
+
+      echo "Enter Root Partition Size in Gb"
+      read PART_ROOT_SIZE
+
+      sgdisk -Z "$IN_DEVICE"
+      sgdisk -n 1::+"$PART_BOOT_SIZE"G -t 1:ef00 -c 1:EFI "$IN_DEVICE"
+      sgdisk -n 2::+"$PART_ROOT_SIZE"G -t 2:8300 -c 2:ROOT "$IN_DEVICE"
+      sgdisk -n 3::+"$PART_SWAP_SIZE"G -t 3:8200 -c 3:SWAP "$IN_DEVICE"
+      sgdisk -n 4 -c 4:HOME "$IN_DEVICE"
+      #sgdisk -n 4::+"$PART_HOME_SIZE" -t 3:8300 -c 4:HOME "$IN_DEVICE"
+   elif [ ${INST_TYPE} -eq 2 ]; then
+      printf "\nUsing Existing Partitions\n"
+   else 
+     printf "\n Command Not Recognized. Exiting."
+   fi
 
    mkfs.fat -F 32 ${PART_BOOT}
    mkfs.ext4 ${PART_ROOT}
    mkswap ${PART_SWAP}
-   mkfs.ext4 ${PART_HOME}
+
+   if [ ${INST_TYPE} -eq 1 ]; then
+	   mkfs.ext4 ${PART_HOME}
+   fi
 
    mount --mkdir ${PART_ROOT} /mnt          # mounting /
    mount --mkdir ${PART_BOOT} /mnt/boot     # mounting /boot
    mount --mkdir ${PART_HOME} /mnt/home     # mounting /home
    swapon ${PART_SWAP}                      # swap on
 }
+
 
 install_base_packages() {
    pacstrap -K /mnt ${BASE_PACS}
@@ -138,7 +139,6 @@ $ARCH_HOSTNAME
 localhost   127.0.0.1
 EOF
 
-  if [ "${WLAN}" -eq 1 ]; then 
     cat << "EOF" > /mnt/etc/systemd/network/25-wireless.network
 [Match]
 Name=wlan0
@@ -152,7 +152,6 @@ EOF
 [General]
 EnableNetworkConfiguration=true
 EOF
-  fi
 
   printf "\n\nSetting up Resolv.conf\n" 
   cp /mnt/etc/resolv.conf /mnt/etc/resolv.conf-bak
@@ -177,7 +176,7 @@ install_x11_packages() {
 }
 
 config_users() {
-  printf "\niEnter Root Password twice\n"
+  printf "\nEnter Root Password twice\n"
   arch-chroot /mnt passwd
 
   sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /mnt/etc/sudoers
@@ -197,7 +196,7 @@ config_systemd() {
 
 kernel_modules() {
  echo "Kernel Modules"
- sed -i 's/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems resume fsck)i/' /etc/mkinitcpio.conf 
+ sed -i 's/^HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems resume fsck)/' /etc/mkinitcpio.conf 
  mkinitcpio --config=/etc/mkinitcpio.conf
 }
 
@@ -209,6 +208,8 @@ install_bootloader() {
 
 cleanup() {
   echo "Saving Logs"
+  me=$(basename "$0")
+  cp $me /mnt/root
   cp /root/*.log /mnt/root
 }
 
@@ -221,7 +222,6 @@ Installation complete!
 
 EOF
 
-  reboot
 }
 
 install_arch_base() {
