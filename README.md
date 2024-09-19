@@ -9,9 +9,12 @@ A script for a minimal Arch OS installation following the installation guide
 # Installation
 
 1. Boot ArchOS from USB in **UEFI MODE** 
-5. Run (note spaces)
-=======
+2. Connect to Internet; e.g.
 ```
-  $ bash <(curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/arch-base-install.sh)
+    $ iwd station wlan0 connect homewifi
+```
+3. Run (note the spaces)
+```
+    $ bash <(curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/arch-base-install.sh)
 ```
 
