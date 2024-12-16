@@ -49,9 +49,9 @@ config_wifi() {
 
 create_partitions(){
 
-    lsblk | grep 'sda\|nvme' 
+    lsblk | grep 'disk' 
     cat <<"EOF"
-Enter the device you want to Install Arch on:
+Enter the disk you want to install Arch on:
 Type One of the above exactly: 
 EOF
    read DEV
@@ -166,7 +166,7 @@ config_time() {
 }
 
 config_locale() {
-  sed -i 's/#${LOCALE}/${LOCALE}/' /mnt/etc/locale.gen
+  sed -i 's/#${LOCALE}/${LOCALE}/g' /mnt/etc/locale.gen
   arch-chroot /mnt locale-gen
   echo "LANG=en_US.UTF-8" > /mnt/etc/locale.conf
 }
@@ -175,23 +175,31 @@ install_x11_packages() {
   arch-chroot /mnt pacman -S --noconfirm ${X11_PACS}
 }
 
+config_systemd() {
+  printf "\nSetting up Systemd\n"
+  arch-chroot /mnt systemctl enable ${SYSTEMD_ENABLED}
+}
+
 config_users() {
-  printf "\nEnter Root Password twice\n"
-  arch-chroot /mnt passwd
 
   sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /mnt/etc/sudoers
 
   printf "\nEnter non-root (sudo) username:\n"
   read inp_username
+  #arch-chroot /mnt useradd -m -G wheel -s /bin/bash ${inp_username}
   arch-chroot /mnt useradd -m -G wheel -s /bin/bash ${inp_username}
 
-  printf "\nEnter User Password Twice\n"
-  arch-chroot /mnt passwd ${inp_username}
-}
+  # added
+  arch-chroot /mnt
 
-config_systemd() {
-  printf "\nSetting up Systemd\n"
-  arch-chroot /mnt systemctl enable ${SYSTEMD_ENABLED}
+  printf "\nEnter user ${inp_username} password twice\n"
+  #arch-chroot /mnt passwd ${inp_username}
+  passwd ${inp_username}
+
+  printf "\nEnter root password twice\n"
+  #arch-chroot /mnt passwd
+  passwd
+
 }
 
 kernel_modules() {
@@ -235,8 +243,8 @@ install_arch_base() {
    config_time
    config_locale
    install_x11_packages
-   config_users
    config_systemd
+   config_users
    kernel_modules
    install_bootloader
    cleanup
