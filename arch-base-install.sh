@@ -186,19 +186,13 @@ config_users() {
 
   printf "\nEnter non-root (sudo) username:\n"
   read inp_username
-  #arch-chroot /mnt useradd -m -G wheel -s /bin/bash ${inp_username}
   arch-chroot /mnt useradd -m -G wheel -s /bin/bash ${inp_username}
 
-  # added
-  arch-chroot /mnt
-
   printf "\nEnter user ${inp_username} password twice\n"
-  #arch-chroot /mnt passwd ${inp_username}
-  passwd ${inp_username}
+  arch-chroot /mnt passwd ${inp_username}
 
   printf "\nEnter root password twice\n"
-  #arch-chroot /mnt passwd
-  passwd
+  arch-chroot /mnt passwd
 
 }
 
