@@ -6,8 +6,7 @@
 #    roughly follows the Installation Guide 
 #
 
-ARCH_VERSION=2024-05-01
-
+LOG_FILE=install-error.log 
 TIME_ZONE="Canada/Eastern"
 LOCALE="en_US.UTF-8 UTF-8"
 
@@ -20,7 +19,7 @@ greeting() {
 
   cat <<EOF
 
-Welcome to Arch ${ARCH_VERSION} OS Installation.
+Welcome to the Minimal Arch OS with X11 Installation.
 
 Press any key to continue. Ctrl-C to exit.
 
@@ -36,7 +35,7 @@ boot_mode() {
 }
 
 get_network_inputs() {
-  printf "\nEnter hostname:"
+  printf "\nEnter a hostname"
   read inp_hostname
   export ARCH_HOSTNAME=${inp_hostname}
 }
@@ -80,7 +79,7 @@ EOF
    read INST_TYPE
 
    if [ ${INST_TYPE} -eq 1 ]; then 
-      printf "\nCreating all new partions\n"
+      printf "\nCreating all new partitions\n"
    	#DEVICE_SIZE=sfdisk -s $IN_DEVICE
 	    DEVICE_SIZE_GB=`lsblk | grep 'sda\|nvme' | awk '{ print $4 }' | cut -d G -f 1`
     	MEM_SIZE_GB=`free -g -h -t | grep Mem | awk '{print $2}' |cut -dG -f 1`
@@ -166,7 +165,7 @@ config_time() {
 }
 
 config_locale() {
-  sed -i 's/#${LOCALE}/${LOCALE}/g' /mnt/etc/locale.gen
+  sed -i 's/#en_US.UTF-8/en_US.UTF-8/g' /mnt/etc/locale.gen
   arch-chroot /mnt locale-gen
   echo "LANG=en_US.UTF-8" > /mnt/etc/locale.conf
 }
@@ -245,5 +244,5 @@ install_arch_base() {
    bye
 }
 
-install_arch_base 2> ./install-error.log 
+install_arch_base 2>&1 | tee -a $LOG_FILE 
 
