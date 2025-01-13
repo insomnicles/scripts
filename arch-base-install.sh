@@ -47,7 +47,6 @@ config_wifi() {
 }
 
 create_partitions(){
-
     lsblk | grep 'disk' 
     cat <<"EOF"
 Enter the disk you want to install Arch on:
@@ -169,7 +168,6 @@ config_locale() {
   arch-chroot /mnt locale-gen
   echo "LANG=en_US.UTF-8" > /mnt/etc/locale.conf
 }
-
 install_x11_packages() {
   arch-chroot /mnt pacman -S --noconfirm ${X11_PACS}
 }
@@ -186,13 +184,22 @@ config_users() {
   printf "\nEnter non-root (sudo) username:\n"
   read inp_username
   arch-chroot /mnt useradd -m -G wheel -s /bin/bash ${inp_username}
+  export USERNAME=${inp_username}
 
   printf "\nEnter user ${inp_username} password twice\n"
   arch-chroot /mnt passwd ${inp_username}
 
   printf "\nEnter root password twice\n"
   arch-chroot /mnt passwd
+}
 
+install_bashmount() {
+  curl -s https://raw.githubusercontent.com/jamielinux/bashmount/refs/heads/master/bashmount > bashmount
+  cp bashmount /mnt/root/bashmount
+  cp bashmount /mnt/home/${USERNAME}/bashmount
+  chmod +x /mnt/root/bashmount
+  chmod +x /mnt/hme/${USERNAME}/bashmount
+  rm bashmount
 }
 
 kernel_modules() {
@@ -232,12 +239,14 @@ install_arch_base() {
    config_wifi
    create_partitions
    install_base_packages
+   install_bashmount
    config_network
    config_time
    config_locale
    install_x11_packages
    config_systemd
    config_users
+   install_bashmount
    kernel_modules
    install_bootloader
    cleanup
