@@ -9,7 +9,7 @@ A script for a minimal Arch OS installation following the installation guide
 # Installation
 
 1. Boot [ArchOS](https://archlinux.org/download/) from USB in **UEFI MODE** 
-2. Connect to Internet; e.g.
+2. Connect to Internet
 ```
 iwd station wlan0 connect network
 ```
