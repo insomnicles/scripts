@@ -133,7 +133,7 @@ install_base_packages() {
 }
 
 config_network() {
-  curl -s $SOURCE_WWW/configs/hostname > /mnt/etc/hostname
+  curl -s ${SOURCE_URL}/configs/hostname > /mnt/etc/hostname
   sed -i '1s/^/$ARCH_HOSTNAME\n/' /mnt/etc/hostname
   # echo -e "$ARCH_HOSTNAME > /mnt/etc/hostname
 #   cat <<EOF > /mnt/etc/hostname
@@ -142,7 +142,7 @@ config_network() {
 # EOF
 
   mkdir -p /mnt/etc/systemd/network
-  curl -s $SOURCE_WWW/configs/25-wireless.network > /mnt/etc/systemd/network/25-wireless.network
+  curl -s ${SOURCE_URL}/configs/25-wireless.network > /mnt/etc/systemd/network/25-wireless.network
 #   cat << "EOF" > /mnt/etc/systemd/network/25-wireless.network
 # [Match]
 # Name=wlan0
@@ -153,7 +153,7 @@ config_network() {
 # EOF
 
   mkdir -p /mnt/etc/iwd
-  curl -s $SOURCE_WWW/configs/iwd-main.conf > /mnt/etc/iwd/main.conf
+  curl -s ${SOURCE_URL}/configs/iwd-main.conf > /mnt/etc/iwd/main.conf
 #   cat << "EOF" > /mnt/etc/systemd/network/25-wireless.network
 #   cat << "EOF" > /mnt/etc/iwd/main.conf
 # [General]
