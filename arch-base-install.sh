@@ -36,13 +36,8 @@ boot_mode() {
   fi
 }
 
-get_network_inputs() {
-  printf "\nEnter a hostname"
-  read inp_hostname
-  export ARCH_HOSTNAME=${inp_hostname}
-}
-
-config_wifi() {
+test_wifi() {
+  # iwctl station wlan0 connect wifiname
   echo -e "\nTesting internet connection..."
   $(ping -c 3 archlinux.org &>/dev/null) || (echo "Not Connected to Network!" && exit 1)
   echo "Connected to the Internet." && sleep 3
@@ -133,10 +128,14 @@ install_base_packages() {
 }
 
 config_network() {
+  printf "\nEnter the hostname"
+  read inp_hostname
+  ARCH_HOSTNAME=${inp_hostname}
+
   curl -s ${SOURCE_URL}/configs/hostname > /mnt/etc/hostname
   sed -i '1s/^/$ARCH_HOSTNAME\n/' /mnt/etc/hostname
-  # echo -e "$ARCH_HOSTNAME > /mnt/etc/hostname
-#   cat <<EOF > /mnt/etc/hostname
+# echo -e "$ARCH_HOSTNAME > /mnt/etc/hostname
+# cat <<EOF > /mnt/etc/hostname
 # $ARCH_HOSTNAME
 # localhost   127.0.0.1
 # EOF
@@ -192,22 +191,17 @@ config_users() {
   printf "\nEnter non-root (sudo) username:\n"
   read inp_username
   arch-chroot /mnt useradd -m -G wheel -s /bin/bash ${inp_username}
-  export USERNAME=${inp_username}
+  USERNAME=${inp_username}
 
   printf "\nEnter user ${inp_username} password twice\n"
   arch-chroot /mnt passwd ${inp_username}
 
   printf "\nEnter root password twice\n"
   arch-chroot /mnt passwd
-}
 
-install_bashmount() {
-  curl -s https://raw.githubusercontent.com/jamielinux/bashmount/refs/heads/master/bashmount > bashmount
-  cp bashmount /mnt/root/bashmount
-  cp bashmount /mnt/home/${USERNAME}/bashmount
-  chmod +x /mnt/root/bashmount
-  chmod +x /mnt/hme/${USERNAME}/bashmount
-  rm bashmount
+  # install bashmount
+  curl -s https://raw.githubusercontent.com/jamielinux/bashmount/refs/heads/master/bashmount > /mnt/home/${USERNAME}/bashmount
+  chmod +x /mnt/home/${USERNAME}/bashmount
 }
 
 kernel_modules() {
@@ -248,14 +242,12 @@ install_arch_base() {
    config_wifi
    create_partitions
    install_base_packages
-   install_bashmount
    config_network
    config_time
    config_locale
    install_x11_packages
    config_systemd
    config_users
-   install_bashmount
    kernel_modules
    install_bootloader
    cleanup
