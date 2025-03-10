@@ -1,16 +1,18 @@
 #!/bin/bash
-#
+
 #   Installation script for base ARCH Linux Installation 
 #    - include base packages
 #              base X11 packages
 #    roughly follows the Installation Guide 
 #
 
-LOG_FILE=install-error.log 
+SOURCE_URL="https://raw.githubusercontent.com/insomnicles/scripts/main"
+LOG_FILE="install-error.log" 
+LAPTOP=$(ls -1 /sys/class/power_supply/BAT0 | wc -l) 
 TIME_ZONE="Canada/Eastern"
 LOCALE="en_US.UTF-8 UTF-8"
 
-BASE_PACS="base linux linux-firmware sof-firmware util-linux iwd man-db man-pages texinfo neovim vi base-devel sudo pacman-contrib intel-ucode grub efibootmgr git openssh zsh"
+BASE_PACS="base linux linux-firmware sof-firmware util-linux iwd man-db man-pages texinfo neovim vi base-devel sudo pacman-contrib intel-ucode grub efibootmgr git openssh zsh gnome-disk-utility"
 X11_PACS="ttf-dejavu gnu-free-fonts xorg-server xorg-xinit xf86-input-libinput xorg-server-common xorg-xclipboard xterm xclip dmenu i3-wm xfce4-terminal firefox"
 
 SYSTEMD_ENABLED="iwd systemd-resolved systemd-timesyncd sshd"
@@ -94,7 +96,7 @@ ROOT: ?
 HOME: all space remaining 
 EOF
       echo "Enter Swap Partition Size in Gb"
-	    read PART_SWAP_SIZE
+	  read PART_SWAP_SIZE
 
       echo "Enter Root Partition Size in Gb"
       read PART_ROOT_SIZE
@@ -125,31 +127,38 @@ EOF
    swapon ${PART_SWAP}                      # swap on
 }
 
-
 install_base_packages() {
    pacstrap -K /mnt ${BASE_PACS}
    genfstab -U /mnt >> /mnt/etc/fstab
 }
 
 config_network() {
-  cat <<EOF > /mnt/etc/hostname
-$ARCH_HOSTNAME
-localhost   127.0.0.1
-EOF
+  curl -s $SOURCE_WWW/configs/hostname > /mnt/etc/hostname
+  sed -i '1s/^/$ARCH_HOSTNAME\n/' /mnt/etc/hostname
+  # echo -e "$ARCH_HOSTNAME > /mnt/etc/hostname
+#   cat <<EOF > /mnt/etc/hostname
+# $ARCH_HOSTNAME
+# localhost   127.0.0.1
+# EOF
 
-    cat << "EOF" > /mnt/etc/systemd/network/25-wireless.network
-[Match]
-Name=wlan0
+  mkdir -p /mnt/etc/systemd/network
+  curl -s $SOURCE_WWW/configs/25-wireless.network > /mnt/etc/systemd/network/25-wireless.network
+#   cat << "EOF" > /mnt/etc/systemd/network/25-wireless.network
+# [Match]
+# Name=wlan0
+#
+# [Network]
+# DHCP=yes
+# IgnoreCarrierLoss=3s
+# EOF
 
-[Network]
-DHCP=yes
-IgnoreCarrierLoss=3s
-EOF
-    mkdir -p /mnt/etc/iwd
-    cat << "EOF" > /mnt/etc/iwd/main.conf
-[General]
-EnableNetworkConfiguration=true
-EOF
+  mkdir -p /mnt/etc/iwd
+  curl -s $SOURCE_WWW/configs/iwd-main.conf > /mnt/etc/iwd/main.conf
+#   cat << "EOF" > /mnt/etc/systemd/network/25-wireless.network
+#   cat << "EOF" > /mnt/etc/iwd/main.conf
+# [General]
+# EnableNetworkConfiguration=true
+# EOF
 
   printf "\n\nSetting up Resolv.conf\n" 
   cp /mnt/etc/resolv.conf /mnt/etc/resolv.conf-bak
@@ -178,7 +187,6 @@ config_systemd() {
 }
 
 config_users() {
-
   sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /mnt/etc/sudoers
 
   printf "\nEnter non-root (sudo) username:\n"
@@ -203,9 +211,10 @@ install_bashmount() {
 }
 
 kernel_modules() {
- echo "Kernel Modules"
- sed -i 's/^HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems resume fsck)/' /etc/mkinitcpio.conf 
- mkinitcpio --config=/etc/mkinitcpio.conf
+  echo "Kernel Modules"
+  arch-chroot sed -i 's/^HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems resume fsck)/' /etc/mkinitcpio.conf 
+  # arch-chroot mkinitcpio --config=/etc/mkinitcpio.conf
+  arch-chroot mkinitcpio -P
 }
 
 install_bootloader() {
