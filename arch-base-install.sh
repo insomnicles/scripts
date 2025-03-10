@@ -212,9 +212,9 @@ install_bashmount() {
 
 kernel_modules() {
   echo "Kernel Modules"
-  arch-chroot sed -i 's/^HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems resume fsck)/' /etc/mkinitcpio.conf 
+  arch-chroot /mnt sed -i 's/^HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems resume fsck)/' /etc/mkinitcpio.conf 
   # arch-chroot mkinitcpio --config=/etc/mkinitcpio.conf
-  arch-chroot mkinitcpio -P
+  arch-chroot /mnt mkinitcpio -P
 }
 
 install_bootloader() {
