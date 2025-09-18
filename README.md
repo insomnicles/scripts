@@ -1,6 +1,9 @@
 # Scripts
 
-A script for a minimal Arch OS installation following the installation guide 
+A script for a minimal Arch OS installation following the installation guide
+
+> [!warning]
+> Don't use this script unless you know how to install Arch already
 
 # Requirements
 
@@ -8,13 +11,17 @@ A script for a minimal Arch OS installation following the installation guide
 
 # Installation
 
-1. Boot [ArchOS](https://archlinux.org/download/) from USB in **UEFI MODE** 
+1. Boot [ArchOS](https://archlinux.org/download/) from USB in **UEFI MODE**
 2. Connect to Internet
+
 ```
 iwd station wlan0 connect network
 ```
+
 3. Run (note the spaces)
+
 ```
 bash <(curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/arch-base-install.sh)
 ```
 
+modified: 20250918
