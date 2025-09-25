@@ -23,5 +23,3 @@ iwd station wlan0 connect network
 ```
 bash <(curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/arch-base-install.sh)
 ```
-
-modified: 20250918

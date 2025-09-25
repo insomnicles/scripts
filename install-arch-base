@@ -34,7 +34,7 @@ greeting() {
 
 Welcome to the Minimal Arch OS with X11 Installation.
 
-**Warning**: this is not a script intended for general use or for installation that require nuanced configurations. Run only if know how to install arch.
+**Warning**: Don't use script: not intended for general use or for installation that require nuanced configurations. 
 
 Press any key to continue. Ctrl-C to exit.
 
