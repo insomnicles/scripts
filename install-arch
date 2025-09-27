@@ -40,34 +40,41 @@ install_arch() {
   printf "Checking boot mode..."
   [[ ! -d /sys/firmware/efi/efivars ]] && printf "\nError: not in UEFI Mode\n" && exit 1
 
-  printf "\nChecking internet connection..."
+  printf "\nChecking internet connection...\n"
   $(ping -c 3 archlinux.org &>/dev/null) || (printf "Not Connected to Network!\n run: iwctl station wlan0 connect wifiname" && exit 1)
 
-  printf "Enter the hostname."
+  printf "Enter the hostname: "
   read HOSTNAME
 
-  printf "Enter the root password."
-  read ROOT_PASSWORD
+  printf "Enter the root password: "
+  read -s ROOT_PASSWORD
 
-  printf "Enter the non-root user username."
+  printf "\nEnter the non-root user username: "
   read USERNAME
 
-  printf "Enter ${USERNAME}'s password."
-  read USER_PASSWORD
+  printf "Enter ${USERNAME}'s password: "
+  read -s USER_PASSWORD
 
-  printf "Install NVIDIA drivers? Y 'Yes'. Any other key 'No'."
+  printf "\nInstall NVIDIA drivers (pointless on portable systems)? Y 'Yes'. Any other key 'No'. "
   read INSTALL_NVIDIA
 
-  printf "Install X11? Y 'Yes'. Any other key 'No'."
-  readi INSTALL_X11
+  printf "Install X11? Y 'Yes'. Any other key 'No'. "
+  read INSTALL_X11
 
-  printf "Configuring paritions."
+  printf "\nConfiguring paritions."
   lsblk --raw | grep 'disk' | cut -d " " -f 1,4
 
-  printf "Enter, exactly as above, what disk you want to install Arch on."
+  printf "Enter, exactly as above, the disk you want to install Arch on: "
   read DEV
+
+  printf "$HOSTNAME $ROOT_PASSWORD $USERNAME $USER_PASSWORD $INSTALL_NVIDIA $INSTALL_X11 $DEV"
+  exit 1
+
+  DEV=sdj
   DEV_PATH=/dev/${DEV}
-  [[ ! -e "$DEV_PATH" ]] && printf "Error: Device '${DEV_PATH}' not recognized" && exit 1
+
+  [[ ! -e "$DEV_PATH" ]] && printf "\nError: Device '${DEV_PATH}' not found.\n" && exit 1
+
   if [[ $DEV_PATH =~ nvme ]]; then
     PART_BOOT="${DEV_PATH}p1"
     PART_ROOT="${DEV_PATH}p2"
@@ -101,27 +108,35 @@ install_arch() {
     printf "\nEnter the root partition size in Gb\n"
     read PART_ROOT_SIZE
 
+    printf "\n$PART_BOOT $PART_ROOT $PART_SWAP $PART_HOME\n"
+    printf "\n$PART_BOOT_SIZE $PART_ROOT_SIZE $PART_SWAP_SIZE $PART_HOME_SIZE\n"
+
     printf "Creating new partitions...\n"
-    sgdisk -Z "$DEV_PATH"
-    sgdisk -n 1::+"$PART_BOOT_SIZE"G -t 1:ef00 -c 1:EFI "$DEV_PATH"
-    sgdisk -n 2::+"$PART_ROOT_SIZE"G -t 2:8300 -c 2:ROOT "$DEV_PATH"
-    sgdisk -n 3::+"$PART_SWAP_SIZE"G -t 3:8200 -c 3:SWAP "$DEV_PATH"
-    sgdisk -n 4 -c 4:HOME "$DEV_PATH"
-    #sgdisk -n 4::+"$PART_HOME_SIZE" -t 3:8300 -c 4:HOME "$DEV_PATH"
+    # sgdisk -Z "$DEV_PATH"
+    # sgdisk -n 1::+"$PART_BOOT_SIZE"G -t 1:ef00 -c 1:EFI "$DEV_PATH"
+    # sgdisk -n 2::+"$PART_ROOT_SIZE"G -t 2:8300 -c 2:ROOT "$DEV_PATH"
+    # sgdisk -n 3::+"$PART_SWAP_SIZE"G -t 3:8200 -c 3:SWAP "$DEV_PATH"
+    # sgdisk -n 4 -c 4:HOME "$DEV_PATH"
 
     printf "Formatting partitions...\n"
-    mkfs.fat -F 32 ${PART_BOOT}
-    mkfs.ext4 ${PART_ROOT}
-    mkswap ${PART_SWAP}
-    [[ ${INST_TYPE} -eq 1 ]] && mkfs.ext4 ${PART_HOME}
+    # mkfs.fat -F 32 ${PART_BOOT}
+    # mkfs.ext4 ${PART_ROOT}
+    # mkswap ${PART_SWAP}
+    # [[ ${INST_TYPE} -eq 1 ]] && mkfs.ext4 ${PART_HOME}
 
   fi
 
+  [ ! -e "$PART_BOOT" ] && printf "Error. $PART_BOOT partition does not exist.\n" && exit 1
+  [ ! -e "$PART_ROOT" ] && printf "Error. $PART_ROOT partition does not exist.\n" && exit 1
+  [ ! -e "$PART_SWAP" ] && printf "Error. $PART_SWAP partition does not exist.\n" && exit 1
+  [ ! -e "$PART_HOME" ] && printf "Error. $PART_HOME partition does not exist.\n" && exit 1
+
   printf "\nMounting partitions.\n"
-  mount --mkdir ${PART_ROOT} /mnt
-  mount --mkdir ${PART_BOOT} /mnt/boot
-  mount --mkdir ${PART_HOME} /mnt/home
-  swapon ${PART_SWAP}
+  # mount --mkdir ${PART_ROOT} /mnt
+  # mount --mkdir ${PART_BOOT} /mnt/boot
+  # mount --mkdir ${PART_HOME} /mnt/home
+  # swapon ${PART_SWAP}
+  exit
 
   printf "\nConfiguring mirrors.\n"
   cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist.bak
