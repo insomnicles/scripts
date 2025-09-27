@@ -13,7 +13,7 @@ CONFIGS_HOSTS="${SOURCE_URL}/configs/hosts"
 CONFIGS_MIRRORS="${SOURCE_URL}/configs/mirrors-ca.txt"
 CONFIGS_DHCP="${SOURCE_URL}/configs/25-wireless.network"
 CONFIGS_IWD="${SOURCE_URL}/configs/iwd-main.conf"
-CONFIGS_KERNEL="${SOURCE_URL}/configs/mkinitcpio.conf"
+CONFIGS_KERNEL="${SOURCE_URL}/configs/mkinitcpio-resume.conf"
 CONFIGS_KERNEL_NVIDIA="${SOURCE_URL}/configs/mkinitcpio-resume-nvidia.conf"
 CONFIGS_NVIDIA_HOOK="${SOURCE_URL}/configs/nvidia.hook"
 CONFIGS_GRUB_NVIDIA="${SOURCE_URL}/configs/grub-nvidia"
@@ -26,9 +26,6 @@ BASE_PACS="base linux linux-firmware sof-firmware util-linux iwd man-db man-page
 NVIDIA_PACS="nvidia nvidia-utils lib32-nvidia-utils"
 X11_PACS="ttf-dejavu gnu-free-fonts xorg-server xorg-xinit xf86-input-libinput xorg-server-common xorg-xclipboard xterm xclip dmenu i3-wm xfce4-terminal firefox gnome-disk-utility"
 SYSTEMD_ENABLED="iwd systemd-resolved systemd-timesyncd sshd"
-
-KERNEL_MODULES_NVIDIA=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
-KERNEL_HOOKS=(base udev autodetect microcode modconf keyboard keymap consolefont block filesystems resume fsck)
 
 BASHMOUNT_URL="https://raw.githubusercontent.com/jamielinux/bashmount/refs/heads/master/bashmount"
 
@@ -170,16 +167,16 @@ install_arch() {
   read cont
 
   printf "\nConfiguring mirrors.\n"
-  cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist.bak
+  cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.bak
   # all mirrors
-  curl -s "https://archlinux.org/mirrorlist/all" >/mnt/etc/pacman.d/mirrors-all.txt
+  curl -s "https://archlinux.org/mirrorlist/all" >/etc/pacman.d/mirrors-all.txt
   # all country mirrors
   country=$(echo "$COUNTRY" | sed -r 's/(_)([a-z])/\U\2/g')
-  awk '/^## ${country}$/{f=1; next}f==0{next}/^$/{exit}{print substr($0, 1);}' /etc/pacman.d/mirrors-${country}.txt
+  awk '/^## ${country}$/{f=1; next}f==0{next}/^$/{exit}{print substr($0, 1);}' /etc/pacman.d/mirrors-all.txt >/etc/pacman.d/mirrors-${country}.txt
   # specific mirror
-  echo "Server = https://mirror.csclub.uwaterloo.ca/archlinux/\$repo/os/\$arch" >/mnt/etc/pacman.d/mirror-local.txt
-  # 5 fastest country mirrors
-  curl -s "https://archlinux.org/mirrorlist/?country=${DOMAIN^^}&protocol=https&use_mirror_status=on" | sed -e 's/^#Server/Server/' -e '/^#/d' | rankmirrors -n 5 - >/mnt/etc/pacman.d/mirrorlist
+  #echo "Server = https://mirror.csclub.uwaterloo.ca/archlinux/\$repo/os/\$arch" >/etc/pacman.d/mirror-local.txt
+  # 5 fastest country mirrors (rankmirrors required)
+  #curl -s "https://archlinux.org/mirrorlist/?country=${DOMAIN^^}&protocol=https&use_mirror_status=on" | sed -e 's/^#Server/Server/' -e '/^#/d' | rankmirrors -n 5 - >/etc/pacman.d/mirrorlist
   read cont
 
   printf "\nInstalling base packages.\n"
@@ -192,9 +189,9 @@ install_arch() {
   read cont
 
   printf "\nConfiguring hosts.\n"
-  cp /mnt/etc/hosts /mnt/etc/hosts.bak
-  curl -s ${CONFIGS_HOSTS} >/mnt/etc/hosts
-  sed -i '1s/^/${HOSTNAME}\n/' /mnt/etc/hosts
+  echo $HOSTNAME >/mnt/etc/hosts
+  curl -s ${CONFIGS_HOSTS} >/mnt/etc/hosts.default
+  cat /mnt/etc/hosts.default >>/mnt/etc/hosts
   read cont
 
   printf "\nConfiguring the network.\n"
@@ -218,7 +215,7 @@ install_arch() {
   read cont
 
   printf "\nConfiguring the locale to ${LOCALE}.\n"
-  sed -i 's/#${LOCALE}/$LOCALE/g' /mnt/etc/locale.gen
+  sed -i 's/#$LOCALE/$LOCALE/g' /mnt/etc/locale.gen
   arch-chroot /mnt locale-gen
   printf "LANG=${LOCALE}" >/mnt/etc/locale.conf
   read cont
@@ -227,9 +224,9 @@ install_arch() {
   arch-chroot /mnt systemctl enable $SYSTEMD_ENABLED
 
   printf "\nConfiguring users.\n"
+  arch-chroot /mnt echo ${ROOT_PASSWORD} | passwd --stdin root
   arch-chroot /mnt useradd -m -G wheel -s /bin/bash $USERNAME
-  arch-chroot /mnt passwd ${USERNAME}
-  arch-chroot /mnt echo ${USER_PASSWORD} | passwd --stdin
+  arch-chroot /mnt echo ${USER_PASSWORD} | passwd --stdin ${USERNAME}
   sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /mnt/etc/sudoers
   read cont
 
@@ -254,7 +251,7 @@ install_arch() {
     mkdir -p /etc/pacman.d/hooks
     curl -s ${CONFIGS_NVIDIA_HOOK} >/mnt/etc/pacman.d/hooks/nvidia.hook
   else
-    curl -s ${CONFIGS_KERNEL} >/etc/mkinitcpio-resume.conf
+    curl -s ${CONFIGS_KERNEL} >/mnt/etc/mkinitcpio.conf
   fi
   arch-chroot /mnt mkinitcpio -P
   read cont
