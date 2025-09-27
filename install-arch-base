@@ -1,277 +1,205 @@
 #!/bin/bash
 
-#   Installation script for base ARCH Linux Installation
-#    - include base packages
-#              base X11 packages
-#    roughly follows the Installation Guide
 #
-# Installation Guide: https://wiki.archlinux.org/title/NVIDIA
-# Installation Guide for Nvidia : https://wiki.archlinux.org/title/NVIDIA
-# See also: https://github.com/korvahannu/arch-nvidia-drivers-installation-guide
+# Minimal ARCH installation with X11, roughly following installation guide, in 200 lines (kinda).
+#
+# Installation Guide: https://wiki.archlinux.org
+# NVIDIA Installation Guide (supplement): https://github.com/korvahannu/arch-nvidia-drivers-installation-guide
+#
+# i. boot_mode, ii. ping network, iii. create partitions, iv. configure mirrors, v. install base packages vi. configure network vii. Conjure time, viii. configure locale, ix. install x11 packages, x. configure systemd, xi. install kernel modules, xii. install bootloader, xiii. save logs
 
 SOURCE_URL="https://raw.githubusercontent.com/insomnicles/scripts/main"
-SOURCE_CONFIGS_URL="https://raw.githubusercontent.com/insomnicles/scripts/main/configs"
-BASHMOUNT_URL="https://raw.githubusercontent.com/jamielinux/bashmount/refs/heads/master/bashmount"
+CONFIGS_HOSTS="${SOURCE_URL}/configs/hosts"
+CONFIGS_MIRRORS="${SOURCE_URL}/configs/mirrors-ca.txt"
+CONFIGS_DHCP="${SOURCE_URL}/configs/25-wireless.network"
+CONFIGS_IWD="${SOURCE_URL}/configs/iwd-main.conf"
+CONFIGS_KERNEL="${SOURCE_URL}/configs/mkinitcpio.conf"
+CONFIGS_KERNEL_NVIDIA="${SOURCE_URL}/configs/mkinitcpio-nvidia.conf"
+CONFIGS_NVIDIA_HOOK="${SOURCE_URL}/configs/nvidia.hook"
+CONFIGS_GRUB_NVIDIA="${SOURCE_URL}/configs/grub-nvidia"
+LOG_FILE="./$(date +%Y%m%d-%H%M)-installation.log"
 
-LOG_FILE="install-error.log"
-LAPTOP=$([[ -f /sys/class/power_supply/BAT0 ]] && echo 0 || echo 1)
+LAPTOP=$([[ -f /sys/class/power_supply/BAT0 ]] && printf 0 || echo 1)
 TIME_ZONE="Canada/Eastern"
 LOCALE="en_US.UTF-8 UTF-8"
-INSTALL_NVIDIA=true
-
-if [ $INSTALL_NVIDIA = true ]; then
-  BASE_PACS="base linux linux-firmware sof-firmware util-linux iwd man-db man-pages texinfo neovim vi base-devel sudo pacman-contrib intel-ucode grub efibootmgr git openssh zsh nvidia"
-else
-  BASE_PACS="base linux linux-firmware sof-firmware util-linux iwd man-db man-pages texinfo neovim vi base-devel sudo pacman-contrib intel-ucode grub efibootmgr git openssh zsh"
-fi
+BASE_PACS="base linux linux-firmware sof-firmware util-linux iwd man-db man-pages texinfo neovim vi base-devel sudo pacman-contrib intel-ucode grub efibootmgr git openssh zsh"
+NVIDIA_PACS="nvidia nvidia-utils lib32-nvidia-utils"
 X11_PACS="ttf-dejavu gnu-free-fonts xorg-server xorg-xinit xf86-input-libinput xorg-server-common xorg-xclipboard xterm xclip dmenu i3-wm xfce4-terminal firefox gnome-disk-utility"
-
 SYSTEMD_ENABLED="iwd systemd-resolved systemd-timesyncd sshd"
 
-greeting() {
+KERNEL_MODULES_NVIDIA=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
+KERNEL_HOOKS=(base udev autodetect microcode modconf keyboard keymap consolefont block filesystems resume fsck)
 
-  cat <<EOF
+BASHMOUNT_URL="https://raw.githubusercontent.com/jamielinux/bashmount/refs/heads/master/bashmount"
 
-Welcome to the Minimal Arch OS with X11 Installation.
+install_arch() {
 
-**Warning**: Don't use script: not intended for general use or for installation that require nuanced configurations. 
-
-Press any key to continue. Ctrl-C to exit.
-
-EOF
+  printf "Welcome to the minimal Arch OS installation. Press any key to continue. Ctrl-C to exit.\n"
   read cont
-}
 
-chk_boot_mode() {
-  if [[ ! -d /sys/firmware/efi/efivars ]]; then
-    echo "Not in UEFI Mode: boot into UEFI mode"
-    exit
-  fi
-}
+  printf "Checking boot mode..."
+  [[ ! -d /sys/firmware/efi/efivars ]] && printf "\nError: not in UEFI Mode\n" && exit 1
 
-chk_wifi() {
-  echo -e "\nTesting internet connection..."
+  printf "\nChecking internet connection..."
   $(ping -c 3 archlinux.org &>/dev/null) || (printf "Not Connected to Network!\n run: iwctl station wlan0 connect wifiname" && exit 1)
-  echo "Connected to the Internet." && sleep 3
-}
 
-create_partitions() {
-  lsblk | grep 'disk'
-  cat <<"EOF"
-Enter the disk you want to install Arch on:
-Type One of the above exactly: 
-EOF
+  printf "Enter the hostname."
+  read HOSTNAME
+
+  printf "Enter the root password."
+  read ROOT_PASSWORD
+
+  printf "Enter the non-root user username."
+  read USERNAME
+
+  printf "Enter ${USERNAME}'s password."
+  read USER_PASSWORD
+
+  printf "Install NVIDIA drivers? Y 'Yes'. Any other key 'No'."
+  read INSTALL_NVIDIA
+
+  printf "Install X11? Y 'Yes'. Any other key 'No'."
+  readi INSTALL_X11
+
+  printf "Configuring paritions."
+  lsblk --raw | grep 'disk' | cut -d " " -f 1,4
+
+  printf "Enter, exactly as above, what disk you want to install Arch on."
   read DEV
-  IN_DEVICE=/dev/${DEV}
-  if [[ $IN_DEVICE =~ nvme ]]; then
-    PART_BOOT="${IN_DEVICE}p1"
-    PART_ROOT="${IN_DEVICE}p2"
-    PART_SWAP="${IN_DEVICE}p3"
-    PART_HOME="${IN_DEVICE}p4"
-  elif [[ $IN_DEVICE =~ 'sd' ]]; then
-    PART_BOOT="${IN_DEVICE}1"
-    PART_ROOT="${IN_DEVICE}2"
-    PART_SWAP="${IN_DEVICE}3"
-    PART_HOME="${IN_DEVICE}4"
-  else
-    echo "Device not recognized" && exit
+  DEV_PATH=/dev/${DEV}
+  [[ ! -e "$DEV_PATH" ]] && printf "Error: Device '${DEV_PATH}' not recognized" && exit 1
+  if [[ $DEV_PATH =~ nvme ]]; then
+    PART_BOOT="${DEV_PATH}p1"
+    PART_ROOT="${DEV_PATH}p2"
+    PART_SWAP="${DEV_PATH}p3"
+    PART_HOME="${DEV_PATH}p4"
+  elif [[ $DEV_PATH =~ 'sd' ]]; then
+    PART_BOOT="${DEV_PATH}1"
+    PART_ROOT="${DEV_PATH}2"
+    PART_SWAP="${DEV_PATH}3"
+    PART_HOME="${DEV_PATH}4"
   fi
 
-  cat <<"EOF"
-
-Do you want to 
-1. create all new partitions?
-2. keep existing partitions (root partition will be eraased)?
-
-EOF
+  printf "\nPartition configuration:\n"
+  printf "1. create new partitions; Warning: all data will be erased.\n"
+  printf "2. keep existing partitions; Warning: **root** partition will be erased.\n"
   read INST_TYPE
 
-  if [ ${INST_TYPE} -eq 1 ]; then
-    printf "\nCreating all new partitions\n"
-    #DEVICE_SIZE=sfdisk -s $IN_DEVICE
+  [[ "${INST_TYPE}" -ne 1 ]] && [[ "${INST_TYPE}" -ne 2 ]] && printf "Error: Command not recognized.\n" && exit 1
+  [[ "${INST_TYPE}" -eq 2 ]] && printf "Using Existing Partitions\n"
+  if [ "${INST_TYPE}" -eq 1 ]; then
+    #DEVICE_SIZE=sfdisk -s $DEV_PATH
     DEVICE_SIZE_GB=$(lsblk | grep 'sda\|nvme' | awk '{ print $4 }' | cut -d G -f 1)
     MEM_SIZE_GB=$(free -g -h -t | grep Mem | awk '{print $2}' | cut -dG -f 1)
     PART_BOOT_SIZE=1
 
-    printf "\nDevice Size: "
-    lsblk | grep 'sda\|nvme'
-    cat <<EOF
-Memory Size: $MEM_SIZE_GB
-UEFI: ${PART_BOOT_SIZE} Gb
-SWAP: ?
-ROOT: ? 
-HOME: all space remaining 
-EOF
-    echo "Enter Swap Partition Size in Gb"
+    printf "RAM: %sGb\nUEFI: %sGb\nSWAP: ?\nROOT: ?\nHOME: remaining space assigned to /home", ${MEM_SIZE_GB}, ${PART_BOOT_SIZE}
+
+    printf "\nEnter the swap partition size in Gb\n"
     read PART_SWAP_SIZE
 
-    echo "Enter Root Partition Size in Gb"
+    printf "\nEnter the root partition size in Gb\n"
     read PART_ROOT_SIZE
 
-    sgdisk -Z "$IN_DEVICE"
-    sgdisk -n 1::+"$PART_BOOT_SIZE"G -t 1:ef00 -c 1:EFI "$IN_DEVICE"
-    sgdisk -n 2::+"$PART_ROOT_SIZE"G -t 2:8300 -c 2:ROOT "$IN_DEVICE"
-    sgdisk -n 3::+"$PART_SWAP_SIZE"G -t 3:8200 -c 3:SWAP "$IN_DEVICE"
-    sgdisk -n 4 -c 4:HOME "$IN_DEVICE"
-    #sgdisk -n 4::+"$PART_HOME_SIZE" -t 3:8300 -c 4:HOME "$IN_DEVICE"
-  elif [ ${INST_TYPE} -eq 2 ]; then
-    printf "\nUsing Existing Partitions\n"
-  else
-    printf "\n Command Not Recognized. Exiting."
+    printf "Creating new partitions...\n"
+    sgdisk -Z "$DEV_PATH"
+    sgdisk -n 1::+"$PART_BOOT_SIZE"G -t 1:ef00 -c 1:EFI "$DEV_PATH"
+    sgdisk -n 2::+"$PART_ROOT_SIZE"G -t 2:8300 -c 2:ROOT "$DEV_PATH"
+    sgdisk -n 3::+"$PART_SWAP_SIZE"G -t 3:8200 -c 3:SWAP "$DEV_PATH"
+    sgdisk -n 4 -c 4:HOME "$DEV_PATH"
+    #sgdisk -n 4::+"$PART_HOME_SIZE" -t 3:8300 -c 4:HOME "$DEV_PATH"
+
+    printf "Formatting partitions...\n"
+    mkfs.fat -F 32 ${PART_BOOT}
+    mkfs.ext4 ${PART_ROOT}
+    mkswap ${PART_SWAP}
+    [[ ${INST_TYPE} -eq 1 ]] && mkfs.ext4 ${PART_HOME}
+
   fi
 
-  mkfs.fat -F 32 ${PART_BOOT}
-  mkfs.ext4 ${PART_ROOT}
-  mkswap ${PART_SWAP}
+  printf "\nMounting partitions.\n"
+  mount --mkdir ${PART_ROOT} /mnt
+  mount --mkdir ${PART_BOOT} /mnt/boot
+  mount --mkdir ${PART_HOME} /mnt/home
+  swapon ${PART_SWAP}
 
-  if [ ${INST_TYPE} -eq 1 ]; then
-    mkfs.ext4 ${PART_HOME}
-  fi
-
-  mount --mkdir ${PART_ROOT} /mnt      # mounting /
-  mount --mkdir ${PART_BOOT} /mnt/boot # mounting /boot
-  mount --mkdir ${PART_HOME} /mnt/home # mounting /home
-  swapon ${PART_SWAP}                  # swap on
-}
-
-config_mirrors() {
-  echo -e "\nConfiguring Mirrors..."
+  printf "\nConfiguring mirrors.\n"
   cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist.bak
-  curl -s ${SOURCE_CONFIGS_URL}/mirrors-ca.txt >/mnt/etc/pacman.d/mirrorlist
-}
+  curl -s ${CONFIGS_MIRRORS} >/mnt/etc/pacman.d/mirrorlist
 
-install_base_packages() {
-  pacstrap -K /mnt ${BASE_PACS}
+  printf "\nInstalling base packages.\n"
+  [ "${INSTALL_NVIDIA}" = "Y" ] && INSTALL_BASE_PACS="${BASE_PACS} ${NVIDIA_PACS}"
+  pacstrap -K /mnt ${INSTALL_BASE_PACS}
   genfstab -U /mnt >>/mnt/etc/fstab
-}
 
-config_network() {
-  printf "\nEnter the hostname"
-  read inp_hostname
-  ARCH_HOSTNAME=${inp_hostname}
-
-  printf "\n\nConfiguring hosts\n"
+  printf "\nConfiguring hosts.\n"
   cp /mnt/etc/hosts /mnt/etc/hosts.bak
-  curl -s ${SOURCE_CONFIGS_URL}/hosts >/mnt/etc/hosts
-  sed -i '1s/^/$ARCH_HOSTNAME\n/' /mnt/etc/hosts
+  curl -s ${CONFIGS_HOSTS} >/mnt/etc/hosts
+  sed -i '1s/^/$HOSTNAME\n/' /mnt/etc/hosts
 
-  printf "\n\nConfiguring dhcp client\n"
+  printf "\nConfiguring the network.\n"
   mkdir -p /mnt/etc/systemd/network
-  curl -s ${SOURCE_CONFIGS_URL}/25-wireless.network >/mnt/etc/systemd/network/25-wireless.network
+  curl -s ${CONFIGS_DHCP} >/mnt/etc/systemd/network/25-wireless.network
 
-  printf "\n\nConfiguring Iwd\n"
   mkdir -p /mnt/etc/iwd
-  curl -s ${SOURCE_CONFIGS_URL}/iwd-main.conf >/mnt/etc/iwd/main.conf
+  curl -s ${CONFIGS_IWD} >/mnt/etc/iwd/main.conf
 
-  printf "\n\nConfiguring resolvd\n"
   cp /mnt/etc/resolv.conf /mnt/etc/resolv.conf-bak
   rm -f /mnt/etc/resolv.conf
   cd /mnt/etc
   ln -sf ../run/systemd/resolve/stub-resolv.conf resolv.conf
-}
 
-config_time() {
-  printf "\n\nConfiguring time\n"
+  printf "\nConfiguring the timezone to ${TIME_ZONE}.\n"
   arch-chroot /mnt ln -sf /usr/share/zoneinfo/${TIME_ZONE} /etc/localtime
   arch-chroot /mnt hwclock --systohc
-}
 
-config_locale() {
-  printf "\n\nConfiguring locale\n"
-  sed -i 's/#en_US.UTF-8/en_US.UTF-8/g' /mnt/etc/locale.gen
+  printf "\nConfiguring the locale to ${LOCALE}.\n"
+  sed -i 's/#${LOCALE}/$LOCALE/g' /mnt/etc/locale.gen
   arch-chroot /mnt locale-gen
-  echo "LANG=en_US.UTF-8" >/mnt/etc/locale.conf
-}
+  printf "LANG=${LOCALE}" >/mnt/etc/locale.conf
 
-install_x11_packages() {
-  printf "\n\nInstalling X11 packages\n"
-  arch-chroot /mnt pacman -S --noconfirm ${X11_PACS}
-}
+  printf "\nConfiguring systemd.\n"
+  arch-chroot /mnt systemctl enable $SYSTEMD_ENABLED
 
-config_systemd() {
-  printf "\nConfiguring systemd\n"
-  arch-chroot /mnt systemctl enable ${SYSTEMD_ENABLED}
-}
-
-config_users() {
-  printf "\nConfiguring users\n"
-
-  printf "\nEnter non-root (sudo) username:\n"
-  read inp_username
-  arch-chroot /mnt useradd -m -G wheel -s /bin/bash ${inp_username}
-  USERNAME=${inp_username}
-
-  printf "\nEnter user ${inp_username} password twice\n"
-  arch-chroot /mnt passwd ${inp_username}
-
-  printf "\nEnter root password twice\n"
-  arch-chroot /mnt passwd
-
+  printf "\nConfiguring users.\n"
+  arch-chroot /mnt useradd -m -G wheel -s /bin/bash $USERNAME
+  arch-chroot /mnt passwd ${USERNAME}
+  arch-chroot /mnt echo ${USER_PASSWORD} | passwd --stdin
   sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /mnt/etc/sudoers
 
-  # install bashmount
-  printf "\n\nInstalling bashmount for ${USERNAME}\n"
+  printf "\nInstalling bashmount for ${USERNAME}.\n"
   curl -s ${BASHMOUNT_URL} >/mnt/home/${USERNAME}/bashmount
   chmod +x /mnt/home/${USERNAME}/bashmount
-}
 
-install_kernel_modules() {
-  echo "Installing Kernel Modules"
-  cp /etc/mkinitcpio.conf /mnt/etc/mkinitcpio.conf.bak
-  if [ $INSTALL_NVIDIA = true ]; then
-    curl -s ${SOURCE_CONFIGS_URL}/mkinitcpio-nvidia.conf >/mnt/etc/mkiningcpio.conf
+  [ "$INSTALL_X11" = "Y" ] && printf "\nInstalling X11 packages." && arch-chroot /mnt pacman -S --noconfirm $X11_PACS
+
+  printf "\nInstalling kernel modules."
+  cp /mnt/etc/mkinitcpio.conf /mnt/etc/mkinitcpio.conf.bak
+  if [ "$INSTALL_NVIDIA" = "Y" ]; then
+    # Use NVIDIA kernel configuration
+    curl -s ${CONFIGS_KERNEL_NVIDIA} >/mnt/etc/mkinitcpio.conf
+
+    # Add Pacman Hook
+    mkdir -p /etc/pacman.d/hooks
+    curl -s ${CONFIGS_NVIDIA_HOOK} >/mnt/etc/pacman.d/hooks
   else
-    curl -s ${SOURCE_CONFIGS_URL}/mkinitcpio.conf >/etc/mkiningcpio.conf
+    curl -s ${CONFIGS_KERNEL} >/etc/mkinitcpio.conf
   fi
-  # arch-chroot /mnt sed -i 's/^HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)/HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems resume fsck)/' /etc/mkinitcpio.conf
   arch-chroot /mnt mkinitcpio -P
-}
 
-install_bootloader() {
-  echo "Creating Bootloader"
-  if [ $INSTALL_NVIDIA = true ]; then
+  printf "\nCreating GRUB Bootloader."
+
+  if [ "$INSTALL_NVIDIA" = "Y" ]; then
+    # enables DRM module in grub
     cp /mnt/etc/default/grub /mnt/etc/default/grub.bak
-    curl -s ${SOURCE_CONFIGS_URL}/grub-nvidia.conf >/mnt/etc/default/grub
+    curl -s ${CONFIGS_GRUB_NVIDIA} >/mnt/etc/default/grub
   fi
   arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
   arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
+
+  printf "\nInstallation complete! Remove USB. Reboot the system or type reboot."
 }
 
-cleanup() {
-  echo "Saving Logs"
-  me=$(basename "$0")
-  cp $me /mnt/root
-  cp /root/*.log /mnt/root
-}
-
-bye() {
-  cat <<"EOF"
-
-Installation complete!
-- remove USB 
-- reboot the system or type reboot
-
-EOF
-
-}
-
-install_arch_base() {
-  greeting
-  chk_boot_mode
-  chk_wifi
-  create_partitions
-  config_mirrors
-  install_base_packages
-  config_network
-  config_time
-  config_locale
-  install_x11_packages
-  config_systemd
-  config_users
-  install_kernel_modules
-  install_bootloader
-  cleanup
-  bye
-}
-
-install_arch_base 2>&1 | tee -a $LOG_FILE
+install_arch 2>&1 | tee -a $LOG_FILE
+cp $(basename "$0") /mnt/root
+cp ${LOG_FILE} >/mnt/root
