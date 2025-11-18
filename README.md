@@ -21,5 +21,5 @@ iwd station wlan0 connect network
 3. Run (note the spaces)
 
 ```
-bash <(curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/arch-base-install.sh)
+bash <(curl -s https://raw.githubusercontent.com/insomnicles/scripts/main/arch-install)
 ```

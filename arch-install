@@ -8,9 +8,10 @@
 #
 # i. boot_mode, ii. ping network, iii. create partitions, iv. configure mirrors, v. install base packages vi. configure network vii. Conjure time, viii. configure locale, ix. install x11 packages, x. configure systemd, xi. install kernel modules, xii. install bootloader, xiii. save logs
 
+ARCH_MIRRORS_ALL="https://archlinux.org/mirrorlist/all/"
 SOURCE_URL="https://raw.githubusercontent.com/insomnicles/scripts/main"
 CONFIGS_HOSTS="${SOURCE_URL}/configs/hosts"
-CONFIGS_MIRRORS="${SOURCE_URL}/configs/mirrors-ca.txt"
+#CONFIGS_MIRRORS="${SOURCE_URL}/configs/mirrors-ca.txt"
 CONFIGS_DHCP="${SOURCE_URL}/configs/25-wireless.network"
 CONFIGS_IWD="${SOURCE_URL}/configs/iwd-main.conf"
 CONFIGS_KERNEL="${SOURCE_URL}/configs/mkinitcpio-resume.conf"
@@ -29,247 +30,296 @@ SYSTEMD_ENABLED="iwd systemd-resolved systemd-timesyncd sshd"
 
 BASHMOUNT_URL="https://raw.githubusercontent.com/jamielinux/bashmount/refs/heads/master/bashmount"
 
-install_arch() {
-
-  printf "Welcome to the minimal Arch OS installation. Press enter to continue. Ctrl-C to exit.\n"
-  read cont
-
-  printf "Checking sudo priviledges..."
-  [ "$(id -u)" != "0" ] && printf "\nError: you do not have sudo priviledges." && exit 1
-
-  printf "Checking boot mode..."
-  [[ ! -d /sys/firmware/efi/efivars ]] && printf "\nError: not in UEFI Mode." && exit 1
-
-  printf "\nChecking internet connection...\n"
-  #  $(ping -c 3 archlinux.org &>/dev/null) || (printf "Not Connected to Network!\n run: iwctl station wlan0 connect wifiname" && exit 1)
-
-  printf "Enter country domain name (ca, uk, au)"
-  read DOMAIN
-
-  printf "Enter country (Canada, United Kingdom, Australia)"
-  read COUNTRY
-
-  printf "Enter the hostname: "
-  read HOSTNAME
-
-  printf "Enter the root password: "
-  read -s ROOT_PASSWORD
-
-  printf "\nEnter the non-root user username: "
-  read USERNAME
-
-  printf "Enter ${USERNAME}'s password: "
-  read -s USER_PASSWORD
-
-  printf "\nInstall NVIDIA drivers (pointless on portable systems)? Y 'Yes'. Any other key 'No'. "
-  read INSTALL_NVIDIA
-
-  printf "Install X11? Y 'Yes'. Any other key 'No'. "
-  read INSTALL_X11
-
-  printf "\nConfiguring paritions."
-  lsblk --raw | grep 'disk' | cut -d " " -f 1,4
-
-  printf "Enter, exactly as above, the disk you want to install Arch on: "
-  read DEV
-
-  printf "\n$HOSTNAME $ROOT_PASSWORD $USERNAME $USER_PASSWORD $INSTALL_NVIDIA $INSTALL_X11 $DEV\n"
-
-  DEV_PATH=/dev/${DEV}
-
-  [[ ! -e "$DEV_PATH" ]] && printf "\nError: Device '${DEV_PATH}' not found.\n" && exit 1
-
-  if [[ $DEV_PATH =~ nvme ]]; then
-    PART_BOOT="${DEV_PATH}p1"
-    PART_ROOT="${DEV_PATH}p2"
-    PART_SWAP="${DEV_PATH}p3"
-    PART_HOME="${DEV_PATH}p4"
-  elif [[ $DEV_PATH =~ 'sd' ]]; then
-    PART_BOOT="${DEV_PATH}1"
-    PART_ROOT="${DEV_PATH}2"
-    PART_SWAP="${DEV_PATH}3"
-    PART_HOME="${DEV_PATH}4"
-  fi
-
-  printf "\nUnmounting partitions.\n"
-  umount /mnt/boot
-  umount /mnt/home
-  umount /mnt
-
-  printf "\nPartition configuration:\n"
-  printf "1. create new partitions; Warning: all data will be erased.\n"
-  printf "2. keep existing partitions; Warning: **root** partition will be erased.\n"
-  read INST_TYPE
-
-  [[ "${INST_TYPE}" -ne 1 ]] && [[ "${INST_TYPE}" -ne 2 ]] && printf "Error: Command not recognized.\n" && exit 1
-  [[ "${INST_TYPE}" -eq 2 ]] && printf "Using Existing Partitions\n"
-  if [ "${INST_TYPE}" -eq 1 ]; then
-    #DEVICE_SIZE=sfdisk -s $DEV_PATH
-    DEVICE_SIZE_GB=$(lsblk | grep 'sda\|nvme' | awk '{ print $4 }' | cut -d G -f 1)
-    MEM_SIZE_GB=$(free -g -h -t | grep Mem | awk '{print $2}' | cut -dG -f 1)
-    PART_BOOT_SIZE=1
-
-    printf "RAM: %sGb\nUEFI: %sGb\nSWAP: ?\nROOT: ?\nHOME: remaining space assigned to /home\n", ${MEM_SIZE_GB}, ${PART_BOOT_SIZE}
-
-    printf "\nEnter the swap partition size in Gb\n"
-    read PART_SWAP_SIZE
-
-    printf "\nEnter the root partition size in Gb\n"
-    read PART_ROOT_SIZE
-
-    printf "\n$PART_BOOT $PART_ROOT $PART_SWAP $PART_HOME\n"
-    printf "\n$PART_BOOT_SIZE $PART_ROOT_SIZE $PART_SWAP_SIZE $PART_HOME_SIZE\n"
-    read cont
-
-    lsblk | grep $DEV
-    printf "You are about to delete the above partitions permanently.\nAre you sure you want to continue? Yes (Y); otherwise exit"
-    read cont
-    [ "${cont}" != "Y" ] && printf "\nExiting." && exit 0
-
-    printf "\nCreating new partitions.\n"
-    sgdisk -Z "$DEV_PATH"                                            # delete mbr and gpt
-    sgdisk -n 1::+"$PART_BOOT_SIZE"G -t 1:ef00 -c 1:EFI "$DEV_PATH"  # efi, fat32
-    sgdisk -n 2::+"$PART_ROOT_SIZE"G -t 2:8300 -c 2:ROOT "$DEV_PATH" # ext4
-    sgdisk -n 3::+"$PART_SWAP_SIZE"G -t 3:8200 -c 3:SWAP "$DEV_PATH" # swap
-    sgdisk -n 4 -c 4:HOME "$DEV_PATH"                                # ext4
-    read cont
-  fi
-
-  [ ! -e "$PART_BOOT" ] && printf "Error. $PART_BOOT partition does not exist.\n" && exit 1
-  [ ! -e "$PART_ROOT" ] && printf "Error. $PART_ROOT partition does not exist.\n" && exit 1
-  [ ! -e "$PART_SWAP" ] && printf "Error. $PART_SWAP partition does not exist.\n" && exit 1
-  [ ! -e "$PART_HOME" ] && printf "Error. $PART_HOME partition does not exist.\n" && exit 1
-
-  printf "\nUnmounting partitions.\n"
-  umount /mnt/boot
-  umount /mnt/home
-  umount /mnt
-  read cont
-
-  printf "\nFormatting partitions.\n"
-  if [[ ${INST_TYPE} -eq 2 ]]; then
-    lsblk | grep $DEV
-    printf "You are about to delete the boot,root and swap partitions of the above device permanently.\nAre you sure you want to continue? Yes (Y); otherwise exit"
-    read cont
-    [ "${cont}" != "Y" ] && printf "\nExiting." && exit 0
-  fi
-  mkfs.fat -F 32 ${PART_BOOT}
-  mkfs.ext4 ${PART_ROOT}
-  mkswap ${PART_SWAP}
-  [[ ${INST_TYPE} -eq 1 ]] && mkfs.ext4 ${PART_HOME}
-  read cont
-
-  printf "\nMounting partitions.\n"
-  mount --mkdir ${PART_ROOT} /mnt
-  mount --mkdir ${PART_BOOT} /mnt/boot
-  mount --mkdir ${PART_HOME} /mnt/home
-  swapon ${PART_SWAP}
-  read cont
-
-  printf "\nConfiguring mirrors.\n"
-  cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.bak
-  # all mirrors
-  curl -s "https://archlinux.org/mirrorlist/all" >/etc/pacman.d/mirrors-all.txt
-  # all country mirrors
-  country=$(echo "$COUNTRY" | sed -r 's/(_)([a-z])/\U\2/g')
-  awk '/^## ${country}$/{f=1; next}f==0{next}/^$/{exit}{print substr($0, 1);}' /etc/pacman.d/mirrors-all.txt >/etc/pacman.d/mirrors-${country}.txt
-  # specific mirror
-  #echo "Server = https://mirror.csclub.uwaterloo.ca/archlinux/\$repo/os/\$arch" >/etc/pacman.d/mirror-local.txt
-  # 5 fastest country mirrors (rankmirrors required)
-  #curl -s "https://archlinux.org/mirrorlist/?country=${DOMAIN^^}&protocol=https&use_mirror_status=on" | sed -e 's/^#Server/Server/' -e '/^#/d' | rankmirrors -n 5 - >/etc/pacman.d/mirrorlist
-  read cont
-
-  printf "\nInstalling base packages.\n"
-  [ "${INSTALL_NVIDIA}" = "Y" ] && BASE_PACS="${BASE_PACS} ${NVIDIA_PACS}"
-  pacstrap -K /mnt ${BASE_PACS}
-  read cont
-
-  printf "\nGenerating FSTAB.\n"
-  genfstab -U /mnt >>/mnt/etc/fstab
-  read cont
-
-  printf "\nConfiguring hosts.\n"
-  echo $HOSTNAME >/mnt/etc/hosts
-  curl -s ${CONFIGS_HOSTS} >/mnt/etc/hosts.default
-  cat /mnt/etc/hosts.default >>/mnt/etc/hosts
-  read cont
-
-  printf "\nConfiguring the network.\n"
-  mkdir -p /mnt/etc/systemd/network
-  curl -s ${CONFIGS_DHCP} >/mnt/etc/systemd/network/25-wireless.network
-  read cont
-
-  mkdir -p /mnt/etc/iwd
-  curl -s ${CONFIGS_IWD} >/mnt/etc/iwd/main.conf
-  read cont
-
-  cp /mnt/etc/resolv.conf /mnt/etc/resolv.conf-bak
-  rm -f /mnt/etc/resolv.conf
-  cd /mnt/etc
-  ln -sf ../run/systemd/resolve/stub-resolv.conf resolv.conf
-  read cont
-
-  printf "\nConfiguring the timezone to ${TIME_ZONE}.\n"
-  arch-chroot /mnt ln -sf /usr/share/zoneinfo/${TIME_ZONE} /etc/localtime
-  arch-chroot /mnt hwclock --systohc
-  read cont
-
-  printf "\nConfiguring the locale to ${LOCALE}.\n"
-  sed -i 's/#$LOCALE/$LOCALE/g' /mnt/etc/locale.gen
-  arch-chroot /mnt locale-gen
-  printf "LANG=${LOCALE}" >/mnt/etc/locale.conf
-  read cont
-
-  printf "\nConfiguring systemd.\n"
-  arch-chroot /mnt systemctl enable $SYSTEMD_ENABLED
-
-  printf "\nConfiguring users.\n"
-  arch-chroot /mnt echo ${ROOT_PASSWORD} | passwd --stdin root
-  arch-chroot /mnt useradd -m -G wheel -s /bin/bash $USERNAME
-  arch-chroot /mnt echo ${USER_PASSWORD} | passwd --stdin ${USERNAME}
-  sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /mnt/etc/sudoers
-  read cont
-
-  printf "\nInstalling bashmount for ${USERNAME}.\n"
-  curl -s ${BASHMOUNT_URL} >/mnt/home/${USERNAME}/bashmount
-  chmod +x /mnt/home/${USERNAME}/bashmount
-  read cont
-
-  if [ "$INSTALL_X11" = "Y" ]; then
-    printf "\nInstalling X11 packages."
-    arch-chroot /mnt pacman -S --noconfirm $X11_PACS
-    read cont
-  fi
-
-  printf "\nInstalling kernel modules."
-  cp /mnt/etc/mkinitcpio.conf /mnt/etc/mkinitcpio.conf.bak
-  if [ "$INSTALL_NVIDIA" = "Y" ]; then
-    # Use NVIDIA kernel configuration
-    curl -s ${CONFIGS_KERNEL_NVIDIA} >/mnt/etc/mkinitcpio.conf
-
-    # Add Pacman Hook
-    mkdir -p /etc/pacman.d/hooks
-    curl -s ${CONFIGS_NVIDIA_HOOK} >/mnt/etc/pacman.d/hooks/nvidia.hook
-  else
-    curl -s ${CONFIGS_KERNEL} >/mnt/etc/mkinitcpio.conf
-  fi
-  arch-chroot /mnt mkinitcpio -P
-  read cont
-
-  printf "\nCreating GRUB Bootloader."
-  if [ "$INSTALL_NVIDIA" = "Y" ]; then
-    # enables DRM module in grub
-    cp /mnt/etc/default/grub /mnt/etc/default/grub.bak
-    curl -s ${CONFIGS_GRUB_NVIDIA} >/mnt/etc/default/grub
-  fi
-  arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
-  arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
-  read cont
-
-  printf "\nInstallation complete! Remove USB. Reboot the system or type reboot."
+check_requirements() {
+    declare urls=("$ARCH_MIRRORS_ALL" "$CONFIGS_HOSTS" "$CONFIGS_MIRRORS" "$CONFIGS_DHCP" "$CONFIGS_IWD" "$CONFIGS_KERNEL" "$CONFIGS_GRUB_NVIDIA" "$CONFIGS_NVIDIA_HOOK")
+    for url in "${urls[@]}"; do
+        # curl -Is $url | head -1 | grep 200 | xargs
+        if [ "$(curl -Is $url | head -1 | grep 200 | xargs)" = "" ]; then
+            printf "Error: url not responding: ${url}.\n" && exit 1
+        else
+            printf "$url OK\n"
+        fi
+    done
 }
 
-install_arch 2>&1 | tee -a $LOG_FILE
+
+install_arch() {
+
+    printf "Welcome to the minimal Arch OS installation. Press enter to continue. Ctrl-C to exit.\n"
+    read cont
+
+    printf "Checking sudo privileges..."
+    [ "$(id -u)" != "0" ] && printf "\nError: you do not have sudo privileges." && exit 1
+
+    printf "Checking boot mode..."
+    [[ ! -d /sys/firmware/efi/efivars ]] && printf "\nError: not in UEFI Mode." && exit 1
+
+    printf "\nChecking internet connection...\n"
+    #  $(ping -c 3 archlinux.org &>/dev/null) || (printf "Not Connected to Network!\n run: iwctl station wlan0 connect wifiname" && exit 1)
+
+    printf "Enter country domain name (ca, uk, au)"
+    read DOMAIN
+
+    printf "Enter country (Canada, United Kingdom, Australia)"
+    read COUNTRY
+
+    printf "Enter the hostname: "
+    read HOSTNAME
+
+    printf "Enter the root password: "
+    read -s ROOT_PASSWORD
+
+    printf "\nEnter the non-root user username: "
+    read USERNAME
+
+    printf "Enter ${USERNAME}'s password: "
+    read -s USER_PASSWORD
+
+    printf "\nInstall NVIDIA drivers (pointless on portable systems)? Y 'Yes'. Any other key 'No'. "
+    read INSTALL_NVIDIA
+
+    printf "Install X11? Y 'Yes'. Any other key 'No'. "
+    read INSTALL_X11
+
+    printf "\nConfiguring partitions."
+    lsblk --raw | grep 'disk' | cut -d " " -f 1,4
+
+    printf "Enter, exactly as above, the disk you want to install Arch on: "
+    read DEV
+
+    printf "\n$HOSTNAME $ROOT_PASSWORD $USERNAME $USER_PASSWORD $INSTALL_NVIDIA $INSTALL_X11 $DEV\n"
+
+    DEV_PATH=/dev/${DEV}
+
+    [[ ! -e "$DEV_PATH" ]] && printf "\nError: Device '${DEV_PATH}' not found.\n" && exit 1
+
+    if [[ $DEV_PATH =~ nvme ]]; then
+        PART_BOOT="${DEV_PATH}p1"
+        PART_ROOT="${DEV_PATH}p2"
+        PART_SWAP="${DEV_PATH}p3"
+        PART_HOME="${DEV_PATH}p4"
+    elif [[ $DEV_PATH =~ 'sd' ]]; then
+        PART_BOOT="${DEV_PATH}1"
+        PART_ROOT="${DEV_PATH}2"
+        PART_SWAP="${DEV_PATH}3"
+        PART_HOME="${DEV_PATH}4"
+    fi
+
+    printf "\nUnmounting partitions.\n"
+    umount /mnt/boot
+    umount /mnt/home
+    umount /mnt
+
+    printf "\nPartition configuration:\n"
+    printf "1. create new partitions; Warning: all data will be erased.\n"
+    printf "2. keep existing partitions; Warning: **root** partition will be erased.\n"
+    read INST_TYPE
+
+    [[ "${INST_TYPE}" -ne 1 ]] && [[ "${INST_TYPE}" -ne 2 ]] && printf "Error: Command not recognized.\n" && exit 1
+    [[ "${INST_TYPE}" -eq 2 ]] && printf "Using Existing Partitions\n"
+    if [ "${INST_TYPE}" -eq 1 ]; then
+        #DEVICE_SIZE=sfdisk -s $DEV_PATH
+        DEVICE_SIZE_GB=$(lsblk | grep 'sda\|nvme' | awk '{ print $4 }' | cut -d G -f 1)
+        MEM_SIZE_GB=$(free -g -h -t | grep Mem | awk '{print $2}' | cut -dG -f 1)
+        PART_BOOT_SIZE=1
+
+        printf "RAM: %sGb\nUEFI: %sGb\nSWAP: ?\nROOT: ?\nHOME: remaining space assigned to /home\n", ${MEM_SIZE_GB}, ${PART_BOOT_SIZE}
+
+        printf "\nEnter the swap partition size in Gb\n"
+        read PART_SWAP_SIZE
+
+        printf "\nEnter the root partition size in Gb\n"
+        read PART_ROOT_SIZE
+
+        printf "\n$PART_BOOT $PART_ROOT $PART_SWAP $PART_HOME\n"
+        printf "\n$PART_BOOT_SIZE $PART_ROOT_SIZE $PART_SWAP_SIZE $PART_HOME_SIZE\n"
+        read cont
+
+        lsblk | grep $DEV
+        printf "You are about to delete the above partitions permanently.\nAre you sure you want to continue? Yes (Y); otherwise exit"
+        read cont
+        [ "${cont}" != "Y" ] && printf "\nExiting." && exit 0
+
+        printf "\nCreating new partitions.\n"
+        sgdisk -Z "$DEV_PATH"                                            # delete mbr and gpt
+        sgdisk -n 1::+"$PART_BOOT_SIZE"G -t 1:ef00 -c 1:EFI "$DEV_PATH"  # efi, fat32
+        sgdisk -n 2::+"$PART_ROOT_SIZE"G -t 2:8300 -c 2:ROOT "$DEV_PATH" # ext4
+        sgdisk -n 3::+"$PART_SWAP_SIZE"G -t 3:8200 -c 3:SWAP "$DEV_PATH" # swap
+        sgdisk -n 4 -c 4:HOME "$DEV_PATH"                                # ext4
+        read cont
+
+        printf "Do you want to encrypt the drive?"
+        # ???LVM:????
+        # 1Gb EFI, 4Gb /boot, rest LVM
+        # 100Gb /root 200Gb /home
+        # sgdisk
+        # sgdisk -Z "$DEV_PATH"                                            # delete mbr and gpt
+        # sgdisk -n 1::+"$PART_EFI_SIZE"G -t 1:ef00 -c 1:EFI "$DEV_PATH"  # efi, fat32
+        # sgdisk -n 2::+"$PART_BOOT_SIZE"G -t 1:ef00 -c 1:EFI "$DEV_PATH"  # ef02 = XBOOT LDR Bios Boot Partition; ext4
+        # sgdisk -n 3 -t 3:8e00 -c 3:LVM" $DEV_PATH"                       # 8e00 = LVM
+        #
+        # cryptsetup luksFormat -v -s 512 -h sha512 /dev/nvme01np3.
+        # enter password: password
+        # cryptsetup open /dev/nvme01np3 /mnt/luks_lvm1
+        # enter password: password
+        # pvcreate /dev/mapper/luks_lvm1
+        # vgcreate arch /dev/mapper/lukx_lvm1
+        # lvcreate -n swap -L 64G -C y arch
+        # lvcreate -n root -l +100G -C y arch
+        # lvcreate -n home -l +100%FREE arch
+
+        # cryptsetup open /dev/nmve1n1p1 arch-home
+        # enter password: password
+        # format drives
+        # mkfs.fat -F32 /dev/... (efi)
+        # mkfs.ext4 /dev/... (boot)
+        # mkfs.ext4 /dev/... (/)
+        # mkfs.ext4 /dev/... (/home)
+        # mkfs.swap /dev/... (swap)
+
+        # mount ... /mnt/
+        # mount ... /mnt/boot
+        # mount ... /mnt/home
+
+    fi
+
+    [ ! -e "$PART_BOOT" ] && printf "Error. $PART_BOOT partition does not exist.\n" && exit 1
+    [ ! -e "$PART_ROOT" ] && printf "Error. $PART_ROOT partition does not exist.\n" && exit 1
+    [ ! -e "$PART_SWAP" ] && printf "Error. $PART_SWAP partition does not exist.\n" && exit 1
+    [ ! -e "$PART_HOME" ] && printf "Error. $PART_HOME partition does not exist.\n" && exit 1
+
+    printf "\nUnmounting partitions.\n"
+    umount /mnt/boot
+    umount /mnt/home
+    umount /mnt
+    read cont
+
+    printf "\nFormatting partitions.\n"
+    if [[ ${INST_TYPE} -eq 2 ]]; then
+        lsblk | grep $DEV
+        printf "You are about to delete the boot,root and swap partitions of the above device permanently.\nAre you sure you want to continue? Yes (Y); otherwise exit"
+        read cont
+        [ "${cont}" != "Y" ] && printf "\nExiting." && exit 0
+    fi
+    mkfs.fat -F 32 ${PART_BOOT}
+    mkfs.ext4 ${PART_ROOT}
+    mkswap ${PART_SWAP}
+    [[ ${INST_TYPE} -eq 1 ]] && mkfs.ext4 ${PART_HOME}
+    read cont
+
+    printf "\nMounting partitions.\n"
+    mount --mkdir ${PART_ROOT} /mnt
+    mount --mkdir ${PART_BOOT} /mnt/boot
+    mount --mkdir ${PART_HOME} /mnt/home
+    swapon ${PART_SWAP}
+    read cont
+
+    printf "\nConfiguring mirrors.\n"
+    cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.bak
+    # all mirrors
+    curl -s $ARCH_MIRRORS_ALL >/etc/pacman.d/mirrors-all.txt
+    # all country mirrors
+    country=$(echo "$COUNTRY" | sed -r 's/(_)([a-z])/\U\2/g')
+    awk '/^## ${country}$/{f=1; next}f==0{next}/^$/{exit}{print substr($0, 1);}' /etc/pacman.d/mirrors-all.txt >/etc/pacman.d/mirrors-${country}.txt
+    # specific mirror
+    #echo "Server = https://mirror.csclub.uwaterloo.ca/archlinux/\$repo/os/\$arch" >/etc/pacman.d/mirror-local.txt
+    # 5 fastest country mirrors (rankmirrors required)
+    #curl -s "https://archlinux.org/mirrorlist/?country=${DOMAIN^^}&protocol=https&use_mirror_status=on" | sed -e 's/^#Server/Server/' -e '/^#/d' | rankmirrors -n 5 - >/etc/pacman.d/mirrorlist
+    read cont
+
+    printf "\nInstalling base packages.\n"
+    [ "${INSTALL_NVIDIA}" = "Y" ] && BASE_PACS="${BASE_PACS} ${NVIDIA_PACS}"
+    pacstrap -K /mnt ${BASE_PACS}
+    read cont
+
+    printf "\nGenerating FSTAB.\n"
+    genfstab -U /mnt >>/mnt/etc/fstab
+    read cont
+
+    printf "\nConfiguring hosts.\n"
+    echo $HOSTNAME >/mnt/etc/hosts
+    curl -s ${CONFIGS_HOSTS} >/mnt/etc/hosts.default
+    cat /mnt/etc/hosts.default >>/mnt/etc/hosts
+    read cont
+
+    printf "\nConfiguring the network.\n"
+    mkdir -p /mnt/etc/systemd/network
+    curl -s ${CONFIGS_DHCP} >/mnt/etc/systemd/network/25-wireless.network
+    read cont
+
+    mkdir -p /mnt/etc/iwd
+    curl -s ${CONFIGS_IWD} >/mnt/etc/iwd/main.conf
+    read cont
+
+    cp /mnt/etc/resolv.conf /mnt/etc/resolv.conf-bak
+    rm -f /mnt/etc/resolv.conf
+    cd /mnt/etc
+    ln -sf ../run/systemd/resolve/stub-resolv.conf resolv.conf
+    read cont
+
+    printf "\nConfiguring the timezone to ${TIME_ZONE}.\n"
+    arch-chroot /mnt ln -sf /usr/share/zoneinfo/${TIME_ZONE} /etc/localtime
+    arch-chroot /mnt hwclock --systohc
+    read cont
+
+    printf "\nConfiguring the locale to ${LOCALE}.\n"
+    sed -i 's/#$LOCALE/$LOCALE/g' /mnt/etc/locale.gen
+    arch-chroot /mnt locale-gen
+    printf "LANG=${LOCALE}" >/mnt/etc/locale.conf
+    read cont
+
+    printf "\nConfiguring systemd.\n"
+    arch-chroot /mnt systemctl enable $SYSTEMD_ENABLED
+
+    printf "\nConfiguring users.\n"
+    arch-chroot /mnt echo ${ROOT_PASSWORD} | passwd --stdin root
+    arch-chroot /mnt useradd -m -G wheel -s /bin/bash $USERNAME
+    arch-chroot /mnt echo ${USER_PASSWORD} | passwd --stdin ${USERNAME}
+    sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /mnt/etc/sudoers
+    read cont
+
+    printf "\nInstalling bashmount for ${USERNAME}.\n"
+    curl -s ${BASHMOUNT_URL} >/mnt/home/${USERNAME}/bashmount
+    chmod +x /mnt/home/${USERNAME}/bashmount
+    read cont
+
+    if [ "$INSTALL_X11" = "Y" ]; then
+        printf "\nInstalling X11 packages."
+        arch-chroot /mnt pacman -S --noconfirm $X11_PACS
+        read cont
+    fi
+
+    printf "\nInstalling kernel modules."
+    # LUKS: HOOKS=(... encrypt lvm2 filesystems ...)
+    cp /mnt/etc/mkinitcpio.conf /mnt/etc/mkinitcpio.conf.bak
+    if [ "$INSTALL_NVIDIA" = "Y" ]; then
+        # Use NVIDIA kernel configuration
+        curl -s ${CONFIGS_KERNEL_NVIDIA} >/mnt/etc/mkinitcpio.conf
+
+        # Add Pacman Hook
+        mkdir -p /etc/pacman.d/hooks
+        curl -s ${CONFIGS_NVIDIA_HOOK} >/mnt/etc/pacman.d/hooks/nvidia.hook
+    else
+        curl -s ${CONFIGS_KERNEL} >/mnt/etc/mkinitcpio.conf
+    fi
+    arch-chroot /mnt mkinitcpio -P
+    read cont
+
+    printf "\nCreating GRUB Bootloader."
+    if [ "$INSTALL_NVIDIA" = "Y" ]; then
+        # enables DRM module in grub
+        cp /mnt/etc/default/grub /mnt/etc/default/grub.bak
+        curl -s ${CONFIGS_GRUB_NVIDIA} >/mnt/etc/default/grub
+    fi
+    arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
+    arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
+    read cont
+
+    printf "\nInstallation complete! Remove USB. Reboot the system or type reboot."
+}
+
+check_requirements
+# install_arch 2>&1 | tee -a $LOG_FILE
 
 [ ! -d "/mnt/root" ] && printf "\nWarning: could not save installation log and installation script to /mnt/root. Directory does not exist\n" && exit 0
 cp $(basename "$0") /mnt/root
