@@ -1,12 +1,11 @@
 #!/bin/bash
 
 #
-# Minimal ARCH installation with X11, roughly following installation guide, in 200 lines (kinda).
+#   Minimal ARCH installation with X11, roughly following installation guide, in 200 lines (kinda).
 #
-# Installation Guide: https://wiki.archlinux.org
-# NVIDIA Installation Guide (supplement): https://github.com/korvahannu/arch-nvidia-drivers-installation-guide
+#   Installation Guide: https://wiki.archlinux.org
+#   NVIDIA Installation Guide (supplement): https://github.com/korvahannu/arch-nvidia-drivers-installation-guide
 #
-# i. boot_mode, ii. ping network, iii. create partitions, iv. configure mirrors, v. install base packages vi. configure network vii. Conjure time, viii. configure locale, ix. install x11 packages, x. configure systemd, xi. install kernel modules, xii. install bootloader, xiii. save logs
 
 ARCH_MIRRORS_ALL="https://archlinux.org/mirrorlist/all/"
 SOURCE_URL="https://raw.githubusercontent.com/insomnicles/scripts/main"
